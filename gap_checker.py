@@ -1,6 +1,6 @@
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 # AEX fondsen
 AEX_TICKERS = [
@@ -52,10 +52,16 @@ def check_gap_down():
     return pd.DataFrame(gap_downs).sort_values('Gap %', ascending=False)
 
 def get_market_status():
-    """Check of de beurs open is"""
-    now = datetime.now()
+    """Check of de beurs open is (Nederlandse tijd)"""
+    now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
+    weekday = now.weekday()  # 0 = maandag, 6 = zondag
     
+    # Weekend
+    if weekday >= 5:
+        return "🔴 Weekend - Beurs gesloten"
+    
+    # Doordeweeks
     if hour < 9:
         return "⏳ Beurs nog niet open"
     elif hour < 17:
