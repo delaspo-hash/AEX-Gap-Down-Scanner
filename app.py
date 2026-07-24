@@ -36,7 +36,7 @@ with col1:
 with col2:
     st.metric("Status", get_market_status())
 with col3:
-	st.metric("Data", get_snapshot_info())
+	st.metric("Data", f"📸 Snapshot van {snapshot_time}")
 
 st.divider()
 
@@ -46,7 +46,7 @@ if st.button("🔄 Ververs data", type="primary"):
 
 # Data ophalen
 with st.spinner("📊 AEX data ophalen..."):
-    df = check_gap_down()
+	df, snapshot_time = check_gap_down()
 
 # Resultaten tonen
 if not df.empty:
