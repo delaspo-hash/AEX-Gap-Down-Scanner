@@ -35,8 +35,6 @@ with col1:
     st.markdown('<p class="main-header">📉 AEX Gap Down Scanner</p>', unsafe_allow_html=True)
 with col2:
     st.metric("Status", get_market_status())
-with col3:
-	st.metric("Data", f"📸 Snapshot van {snapshot_time}")
 
 st.divider()
 
@@ -46,7 +44,15 @@ if st.button("🔄 Ververs data", type="primary"):
 
 # Data ophalen
 with st.spinner("📊 AEX data ophalen..."):
-	df, snapshot_time = check_gap_down()
+    df, snapshot_time = check_gap_down()
+
+# Derde metric na data ophalen
+with col3:
+    st.metric("Data", f"📸 Snapshot van {snapshot_time}")
+
+# Refresh knop
+if st.button("🔄 Ververs data", type="primary"):
+    st.rerun()
 
 # Resultaten tonen
 if not df.empty:
