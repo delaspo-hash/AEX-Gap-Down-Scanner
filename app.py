@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from gap_checker import check_gap_down, get_market_status
+from gap_checker import check_gap_down, get_market_status, get_snapshot_info
 from datetime import datetime, timezone, timedelta
 
 # Pagina configuratie
@@ -36,8 +36,7 @@ with col1:
 with col2:
     st.metric("Status", get_market_status())
 with col3:
-	nederland_tijd = datetime.now(timezone.utc) + timedelta(hours=2)
-	st.metric("Laatste update", nederland_tijd.strftime("%H:%M:%S"))
+	st.metric("Data", get_snapshot_info())
 
 st.divider()
 
@@ -131,4 +130,4 @@ else:
 
 # Footer
 st.divider()
-st.caption(f"📊 Data via Yahoo Finance (15 min vertraagd) • AEX fondsen • {nederland_tijd.strftime('%d-%m-%Y')}")
+st.caption(f"📊 Data via Yahoo Finance (15 min vertraagd) • AEX fondsen • {get_snapshot_info()}")
