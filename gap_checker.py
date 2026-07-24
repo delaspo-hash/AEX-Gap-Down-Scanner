@@ -13,12 +13,11 @@ AEX_TICKERS = [
 ]
 
 SNAPSHOT_FILE = "snapshot.json"
-CACHE_FILE = "cache.json"
 
 def get_stock_data(ticker):
-    """Haal 5 dagen koersdata op"""
-    data = yf.download(ticker, period="5d", interval="1d", progress=False)
-    if len(data) < 2:
+    """Haal 10 dagen koersdata op voor voldoende historie"""
+    data = yf.download(ticker, period="10d", interval="1d", progress=False)
+    if len(data) < 3:
         return None
     return data
 
@@ -26,9 +25,12 @@ def is_snapshot_today():
     """Check of er vandaag al een snapshot is gemaakt"""
     if not os.path.exists(SNAPSHOT_FILE):
         return False
-    with open(SNAPSHOT_FILE, 'r') as f:
-        snap = json.load(f)
-    return snap.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    try:
+        with open(SNAPSHOT_FILE, 'r') as f:
+            snap = json.load(f)
+        return snap.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    except:
+        return False
 
 def save_snapshot(df):
     """Sla snapshot op voor vandaag"""
@@ -46,49 +48,66 @@ def load_snapshot():
         snap = json.load(f)
     return pd.DataFrame(snap['data']), snap['time']
 
-def check_gap_down():
-    """Check alle AEX fondsen op gap downs"""
-    # Als er al een snapshot is voor vandaag, gebruik die
-    try:
-        if is_snapshot_today():
-            return load_snapshot()
-    except:
-        pass  # Bestand corrupt of niet leesbaar, gewoon opnieuw ophalen
+def check_bearish_gap():
+    """
+    Zoek bearish gap down + bearish candle patroon:
+    Dag N+1 open < Dag N low (gap down)
+    Dag N+1 close < Dag N+1 open (bearish candle)
+    """
+    if is_snapshot_today():
+        return load_snapshot()
     
-    # Anders: nieuwe data ophalen
-    gap_downs = []
+    results = []
     nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
     
     for ticker in AEX_TICKERS:
         try:
             data = get_stock_data(ticker)
-            if data is None:
+            if data is None or len(data) < 3:
                 continue
+            
+            # Dag N = 3 dagen geleden, Dag N+1 = 2 dagen geleden, Dag N+2 = gisteren
+            dag_n = data.iloc[-3]    # dag N
+            dag_n1 = data.iloc[-2]   # dag N+1
+            dag_n2 = data.iloc[-1]   # dag N+2 (vandaag/gisteren)
+            
+            open_n = float(dag_n['Open'].iloc[0])
+            high_n = float(dag_n['High'].iloc[0])
+            low_n = float(dag_n['Low'].iloc[0])
+            close_n = float(dag_n['Close'].iloc[0])
+            
+            open_n1 = float(dag_n1['Open'].iloc[0])
+            high_n1 = float(dag_n1['High'].iloc[0])
+            low_n1 = float(dag_n1['Low'].iloc[0])
+            close_n1 = float(dag_n1['Close'].iloc[0])
+            
+            open_n2 = float(dag_n2['Open'].iloc[0])
+            
+            # Conditie 1: N+1 open < N low (gap down)
+            gap_down = open_n1 < low_n
+            
+            # Conditie 2: N+1 close < N+1 open (bearish candle)
+            bearish_candle = close_n1 < open_n1
+            
+            if gap_down and bearish_candle:
+                gap_pct = ((low_n - open_n1) / low_n) * 100
+                candle_pct = ((open_n1 - close_n1) / open_n1) * 100
                 
-            prev_day = data.iloc[-2]
-            last_day = data.iloc[-1]
-            
-            prev_low = float(prev_day['Low'].iloc[0])
-            prev_close = float(prev_day['Close'].iloc[0])
-            today_open = float(last_day['Open'].iloc[0])
-            
-            if today_open < prev_low:
-                gap_pct = ((prev_low - today_open) / prev_low) * 100
-                gap_downs.append({
+                results.append({
                     'Ticker': ticker.replace('.AS', ''),
-                    'Slot gisteren': round(prev_close, 2),
-                    'Low gisteren': round(prev_low, 2),
-                    'Open vandaag': round(today_open, 2),
-                    'Gap %': round(gap_pct, 2)
+                    'Dag N Low': round(low_n, 2),
+                    'N+1 Open': round(open_n1, 2),
+                    'N+1 Close': round(close_n1, 2),
+                    'Gap %': round(gap_pct, 2),
+                    'Candle %': round(candle_pct, 2)
                 })
         except:
             continue
     
-    df = pd.DataFrame(gap_downs)
+    df = pd.DataFrame(results)
     if not df.empty:
         df = df.sort_values('Gap %', ascending=False)
     
-    # Alleen snapshot opslaan als de beurs open is geweest
     if nederland_nu.hour >= 9:
         try:
             save_snapshot(df)
@@ -105,7 +124,6 @@ def get_market_status():
     
     if weekday >= 5:
         return "🔴 Weekend - Beurs gesloten"
-    
     if hour < 9:
         return "⏳ Beurs nog niet open"
     elif hour < 17:
@@ -114,7 +132,6 @@ def get_market_status():
         return "🔴 Beurs gesloten"
 
 def get_snapshot_info():
-    """Haal info op over de snapshot"""
     try:
         if is_snapshot_today():
             _, time = load_snapshot()
