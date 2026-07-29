@@ -12,88 +12,85 @@ AEX_TICKERS = [
     "UNA.AS", "VPK.AS", "WKL.AS"
 ]
 
-SNAPSHOT_FILE = "snapshot.json"
+HISTORY_FILE = "history.json"
+TODAY_SNAPSHOT_FLAG = "snapshot_done.json"
 
 def get_stock_data(ticker):
-    """Haal 10 dagen koersdata op voor voldoende historie"""
     data = yf.download(ticker, period="10d", interval="1d", progress=False)
     if len(data) < 3:
         return None
     return data
 
-def is_snapshot_today():
-    """Check of er vandaag al een snapshot is gemaakt"""
-    if not os.path.exists(SNAPSHOT_FILE):
+def load_history():
+    """Laad alle historische signalen"""
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_history(history):
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(history, f, indent=2)
+
+def is_today_already_scanned():
+    """Check of we vandaag al gescand hebben"""
+    if not os.path.exists(TODAY_SNAPSHOT_FLAG):
         return False
     try:
-        with open(SNAPSHOT_FILE, 'r') as f:
-            snap = json.load(f)
-        return snap.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        with open(TODAY_SNAPSHOT_FLAG, 'r') as f:
+            data = json.load(f)
+        return data.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d')
     except:
         return False
 
-def save_snapshot(df):
-    """Sla snapshot op voor vandaag"""
-    snapshot = {
-        'date': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
-        'time': (datetime.now(timezone.utc) + timedelta(hours=2)).strftime('%H:%M'),
-        'data': df.to_dict('records')
-    }
-    with open(SNAPSHOT_FILE, 'w') as f:
-        json.dump(snapshot, f)
+def mark_today_scanned():
+    with open(TODAY_SNAPSHOT_FLAG, 'w') as f:
+        json.dump({'date': datetime.now(timezone.utc).strftime('%Y-%m-%d')}, f)
 
-def load_snapshot():
-    """Laad de snapshot van vandaag"""
-    with open(SNAPSHOT_FILE, 'r') as f:
-        snap = json.load(f)
-    return pd.DataFrame(snap['data']), snap['time']
-
-def check_bearish_gap():
-    """
-    Zoek bearish gap down + bearish candle patroon:
-    Dag N+1 open < Dag N low (gap down)
-    Dag N+1 close < Dag N+1 open (bearish candle)
-    """
-    if is_snapshot_today():
-        return load_snapshot()
+def scan_today():
+    """Scan de markt voor nieuwe bearish gap signalen en voeg toe aan historie"""
+    history = load_history()
+    today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
-    results = []
-    nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
+    # Voorkom dubbele scans op dezelfde dag
+    if is_today_already_scanned():
+        return history  # return bestaande historie zonder opnieuw te fetchen
     
+    new_entries = []
     for ticker in AEX_TICKERS:
         try:
             data = get_stock_data(ticker)
             if data is None or len(data) < 3:
                 continue
             
-            # Dag N = 3 dagen geleden, Dag N+1 = 2 dagen geleden, Dag N+2 = gisteren
-            dag_n = data.iloc[-3]    # dag N
-            dag_n1 = data.iloc[-2]   # dag N+1
-            dag_n2 = data.iloc[-1]   # dag N+2 (vandaag/gisteren)
+            dag_n = data.iloc[-3]
+            dag_n1 = data.iloc[-2]
             
-            open_n = float(dag_n['Open'].iloc[0])
-            high_n = float(dag_n['High'].iloc[0])
             low_n = float(dag_n['Low'].iloc[0])
-            close_n = float(dag_n['Close'].iloc[0])
-            
             open_n1 = float(dag_n1['Open'].iloc[0])
-            high_n1 = float(dag_n1['High'].iloc[0])
-            low_n1 = float(dag_n1['Low'].iloc[0])
             close_n1 = float(dag_n1['Close'].iloc[0])
             
-            open_n2 = float(dag_n2['Open'].iloc[0])
-            
-            # Conditie 1: N+1 open < N low (gap down)
+            # Gap down: N+1 open < N low
             gap_down = open_n1 < low_n
+            # Bearish candle: N+1 close < N+1 open
+            bearish = close_n1 < open_n1
             
-            # Conditie 2: N+1 close < N+1 open (bearish candle)
-            bearish_candle = close_n1 < open_n1
-            
-            if gap_down and bearish_candle:
-                gap_pct = ((low_n - open_n1) / low_n) * 100
-                candle_pct = ((open_n1 - close_n1) / open_n1) * 100
+            if gap_down and bearish:
+                gap_pct = ((low_n - open_n1) / low_n) * 100  # positief
+                candle_pct = ((close_n1 - open_n1) / open_n1) * 100  # negatief
                 
-                results.append({
+                # Bepaal de datum van de gap (N+1) – dat is de handelsdag van dag_n1
+                gap_date = dag_n1.name  # index is datetime
+                if hasattr(gap_date, 'strftime'):
+                    gap_date_str = gap_date.strftime('%Y-%m-%d')
+                else:
+                    gap_date_str = str(gap_date)[:10]
+                
+                new_entries.append({
+                    'Datum': gap_date_str,
                     'Ticker': ticker.replace('.AS', ''),
                     'Dag N Low': round(low_n, 2),
                     'N+1 Open': round(open_n1, 2),
@@ -104,24 +101,33 @@ def check_bearish_gap():
         except:
             continue
     
-    df = pd.DataFrame(results)
-    if not df.empty:
-        df = df.sort_values('Gap %', ascending=False)
+    if new_entries:
+        # Voeg toe aan bestaande historie
+        history.extend(new_entries)
+        save_history(history)
     
-    if nederland_nu.hour >= 9:
-        try:
-            save_snapshot(df)
-        except:
-            pass
+    # Markeer vandaag als gescand
+    mark_today_scanned()
+    return history
+
+def check_bearish_gap():
+    """Retourneer de volledige historie als DataFrame, en de huidige tijd"""
+    history = scan_today()  # scant indien nodig, anders bestaande historie
     
-    return df, (datetime.now(timezone.utc) + timedelta(hours=2)).strftime('%H:%M')
+    if history:
+        df = pd.DataFrame(history)
+        # Sorteer op datum aflopend, dan op gap % aflopend
+        df = df.sort_values(['Datum', 'Gap %'], ascending=[False, False])
+    else:
+        df = pd.DataFrame()
+    
+    snapshot_time = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime('%H:%M')
+    return df, snapshot_time
 
 def get_market_status():
-    """Check of de beurs open is (Nederlandse tijd)"""
     now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
     weekday = now.weekday()
-    
     if weekday >= 5:
         return "🔴 Weekend - Beurs gesloten"
     if hour < 9:
@@ -132,10 +138,6 @@ def get_market_status():
         return "🔴 Beurs gesloten"
 
 def get_snapshot_info():
-    try:
-        if is_snapshot_today():
-            _, time = load_snapshot()
-            return f"📸 Snapshot van {time}"
-    except:
-        pass
-    return "🔄 Live data"
+    if is_today_already_scanned():
+        return f"📸 Scan van vandaag uitgevoerd"
+    return "🔄 Nog niet gescand vandaag"

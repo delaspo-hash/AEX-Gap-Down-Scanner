@@ -4,57 +4,56 @@ import plotly.express as px
 from gap_checker import check_bearish_gap, get_market_status, get_snapshot_info
 from datetime import datetime
 
-# Pagina configuratie
 st.set_page_config(
     page_title="AEX Bearish Gap Scanner",
     page_icon="🐻",
     layout="wide"
 )
 
-# Header
 st.markdown('<p style="font-size:2.5rem;font-weight:bold;color:#FF4B4B;">🐻 Bearish Gap Scanner</p>', unsafe_allow_html=True)
 
-# Status en data ophalen
 status = get_market_status()
 df, snapshot_time = check_bearish_gap()
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 col1.metric("Status", status)
-col2.metric("Data", f"📸 {snapshot_time}")
+col2.metric("Scan tijd", f"📸 {snapshot_time}")
+col3.metric("Historie", f"{len(df)} signalen")
 
 st.divider()
 
-# Refresh knop
 if st.button("🔄 Ververs data", type="primary", key="refresh"):
     st.rerun()
 
-# Resultaten
 if not df.empty:
-    total = len(df)
-    avg_gap = df['Gap %'].mean()
-    avg_candle = df['Candle %'].mean()
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Aantal signalen", total)
-    m2.metric("Gem. gap down", f"{avg_gap:.2f}%")
-    m3.metric("Gem. bearish candle", f"{avg_candle:.2f}%")
-
+    # Samenvatting van vandaag of laatste dag
+    latest_date = df['Datum'].max()
+    today_df = df[df['Datum'] == latest_date]
+    
+    if not today_df.empty:
+        st.subheader(f"📅 Signalen van {latest_date}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Aantal vandaag", len(today_df))
+        c2.metric("Gem. gap %", f"{today_df['Gap %'].mean():.2f}%")
+        c3.metric("Gem. candle %", f"{today_df['Candle %'].mean():.2f}%")
+    else:
+        st.info("Geen signalen gevonden voor de meest recente datum.")
+    
     st.divider()
-    st.subheader("📊 Gap Down Percentages")
-
-    fig = px.bar(df, x='Ticker', y='Gap %', color='Gap %',
-                 color_continuous_scale='Reds', text='Gap %')
-    fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside',
-                      marker_line_color='darkred', marker_line_width=1)
-    fig.update_layout(showlegend=False, height=500,
-                      xaxis_title="", yaxis_title="Gap Percentage",
+    st.subheader("📈 Gap % per aandeel (alle historie)")
+    # Bar chart van alle data, ingekleurd per datum
+    fig = px.bar(df, x='Ticker', y='Gap %', color='Datum',
+                 text='Gap %', barmode='group',
+                 color_discrete_sequence=px.colors.sequential.Reds_r)
+    fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+    fig.update_layout(height=500, xaxis_title="", yaxis_title="Gap Percentage",
                       plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                       font=dict(color='white'))
     st.plotly_chart(fig, use_container_width=True)
-
+    
     st.divider()
-    st.subheader("📋 Bearish Gap + Bearish Candle")
-
+    st.subheader("📋 Alle Bearish Gap Signalens")
+    
     styled_df = df.style.background_gradient(subset=['Gap %', 'Candle %'], cmap='Reds').format({
         'Dag N Low': '{:.2f}',
         'N+1 Open': '{:.2f}',
@@ -62,23 +61,22 @@ if not df.empty:
         'Gap %': '{:.2f}%',
         'Candle %': '{:.2f}%'
     })
-    st.dataframe(styled_df, use_container_width=True, height=400)
-
+    st.dataframe(styled_df, use_container_width=True, height=500)
+    
     csv = df.to_csv(index=False)
-    st.download_button("📥 Download als CSV", data=csv,
-                       file_name=f"bearish_gaps_{datetime.now().strftime('%Y%m%d')}.csv",
+    st.download_button("📥 Download historie als CSV", data=csv,
+                       file_name=f"bearish_gaps_history_{datetime.now().strftime('%Y%m%d')}.csv",
                        mime="text/csv")
-
 else:
-    st.success("✅ Geen bearish gap signalen gevonden vandaag!")
+    st.success("✅ Nog geen bearish gap signalen gevonden.")
     st.markdown("""
     ### 📖 Bearish Gap + Bearish Candle
-    Dit patroon toont aandelen die aan twee voorwaarden voldoen:
-    - **N+1 Open < N Low** → gap down (lager geopend dan de laagste koers van de dag ervoor)
-    - **N+1 Close < N+1 Open** → bearish candle (lager gesloten dan geopend)
+    Dit patroon bestaat uit:
+    - **Dag N+1 open < laagste koers van Dag N** (gap down)
+    - **Dag N+1 slot < opening van Dag N+1** (bearish candle)
     
-    Dit is een sterk bearish signaal op de daily timeframe.
+    Zodra de scan 's ochtends draait, worden nieuwe signalen automatisch bewaard.
     """)
 
 st.divider()
-st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX fondsen")
+st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • Historie wordt lokaal opgeslagen in de cloud")
