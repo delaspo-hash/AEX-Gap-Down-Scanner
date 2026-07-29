@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 import json
 import os
 
+# === CONSTANTEN ===
 AEX_TICKERS = [
     "ADYEN.AS", "AGN.AS", "AKZA.AS", "ASM.AS", "ASML.AS",
     "BESI.AS", "DSM.AS", "EXO.AS", "HEIA.AS", "HEIN.AS",
@@ -13,16 +14,73 @@ AEX_TICKERS = [
 ]
 
 HISTORY_FILE = "history.json"
-TODAY_SNAPSHOT_FLAG = "snapshot_done.json"
+TODAY_FLAG = "snapshot_done.json"
+TICKER_CACHE = "ticker_cache.json"
 
+# === TICKERLIJSTEN OPHALEN (met cache) ===
+def fetch_sp500_tickers():
+    """Haal S&P 500 tickers van Wikipedia"""
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    try:
+        tables = pd.read_html(url)
+        df = tables[0]
+        tickers = df['Symbol'].tolist()
+        return [t.replace('.', '-') for t in tickers]  # Yahoo gebruikt '-' ipv punt
+    except:
+        return []
+
+def fetch_nasdaq100_tickers():
+    """Haal Nasdaq-100 tickers van Wikipedia"""
+    url = "https://en.wikipedia.org/wiki/Nasdaq-100"
+    try:
+        tables = pd.read_html(url)
+        # De juiste tabel vinden (meestal de 4e of 3e)
+        for table in tables:
+            if 'Ticker' in table.columns or 'Symbol' in table.columns:
+                col = 'Ticker' if 'Ticker' in table.columns else 'Symbol'
+                tickers = table[col].tolist()
+                return [t.replace('.', '-') for t in tickers if isinstance(t, str)]
+        return []
+    except:
+        return []
+
+def get_all_us_tickers():
+    """Haal S&P500 + Nasdaq-100, gecached voor 1 dag"""
+    cache = {}
+    if os.path.exists(TICKER_CACHE):
+        try:
+            with open(TICKER_CACHE, 'r') as f:
+                cache = json.load(f)
+            if cache.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d'):
+                return cache['tickers']
+        except:
+            pass
+
+    sp500 = fetch_sp500_tickers()
+    nasdaq100 = fetch_nasdaq100_tickers()
+
+    all_us = list(set(sp500 + nasdaq100))  # uniek
+    # Cache opslaan
+    cache = {
+        'date': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+        'tickers': all_us
+    }
+    with open(TICKER_CACHE, 'w') as f:
+        json.dump(cache, f)
+    return all_us
+
+# === DATA OPHALEN ===
 def get_stock_data(ticker):
-    data = yf.download(ticker, period="10d", interval="1d", progress=False)
-    if len(data) < 3:
+    try:
+        data = yf.download(ticker, period="10d", interval="1d", progress=False)
+        if len(data) < 3:
+            return None
+        return data
+    except:
         return None
-    return data
 
+# === HISTORIE BEHEREN ===
 def load_history():
-    """Laad alle historische signalen"""
     if not os.path.exists(HISTORY_FILE):
         return []
     try:
@@ -36,62 +94,71 @@ def save_history(history):
         json.dump(history, f, indent=2)
 
 def is_today_already_scanned():
-    """Check of we vandaag al gescand hebben"""
-    if not os.path.exists(TODAY_SNAPSHOT_FLAG):
+    if not os.path.exists(TODAY_FLAG):
         return False
     try:
-        with open(TODAY_SNAPSHOT_FLAG, 'r') as f:
+        with open(TODAY_FLAG, 'r') as f:
             data = json.load(f)
         return data.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d')
     except:
         return False
 
 def mark_today_scanned():
-    with open(TODAY_SNAPSHOT_FLAG, 'w') as f:
+    with open(TODAY_FLAG, 'w') as f:
         json.dump({'date': datetime.now(timezone.utc).strftime('%Y-%m-%d')}, f)
 
+# === SCAN ===
 def scan_today():
-    """Scan de markt voor nieuwe bearish gap signalen en voeg toe aan historie"""
     history = load_history()
-    today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    
-    # Voorkom dubbele scans op dezelfde dag
+
     if is_today_already_scanned():
-        return history  # return bestaande historie zonder opnieuw te fetchen
-    
+        return history
+
+    # Bouw complete tickerlijst: AEX + US
+    us_tickers = get_all_us_tickers()
+    all_tickers = AEX_TICKERS + us_tickers
+
     new_entries = []
-    for ticker in AEX_TICKERS:
+    for ticker in all_tickers:
         try:
             data = get_stock_data(ticker)
             if data is None or len(data) < 3:
                 continue
-            
+
             dag_n = data.iloc[-3]
             dag_n1 = data.iloc[-2]
-            
+
             low_n = float(dag_n['Low'].iloc[0])
             open_n1 = float(dag_n1['Open'].iloc[0])
             close_n1 = float(dag_n1['Close'].iloc[0])
-            
-            # Gap down: N+1 open < N low
+
             gap_down = open_n1 < low_n
-            # Bearish candle: N+1 close < N+1 open
             bearish = close_n1 < open_n1
-            
+
             if gap_down and bearish:
-                gap_pct = ((low_n - open_n1) / low_n) * 100  # positief
-                candle_pct = ((close_n1 - open_n1) / open_n1) * 100  # negatief
-                
-                # Bepaal de datum van de gap (N+1) – dat is de handelsdag van dag_n1
-                gap_date = dag_n1.name  # index is datetime
+                gap_pct = ((low_n - open_n1) / low_n) * 100
+                candle_pct = ((close_n1 - open_n1) / open_n1) * 100
+
+                gap_date = dag_n1.name
                 if hasattr(gap_date, 'strftime'):
                     gap_date_str = gap_date.strftime('%Y-%m-%d')
                 else:
                     gap_date_str = str(gap_date)[:10]
-                
+
+                # Exchange bepalen
+                if ticker in AEX_TICKERS:
+                    exchange = "AEX"
+                elif ticker in us_tickers:
+                    # Simpele check: NYSE/NASDAQ onderscheiden is niet perfect,
+                    # maar we kunnen kijken naar de oorspronkelijke lijst
+                    exchange = "NYSE/NASDAQ"
+                else:
+                    exchange = "US"
+
                 new_entries.append({
                     'Datum': gap_date_str,
                     'Ticker': ticker.replace('.AS', ''),
+                    'Exchange': exchange,
                     'Dag N Low': round(low_n, 2),
                     'N+1 Open': round(open_n1, 2),
                     'N+1 Close': round(close_n1, 2),
@@ -100,27 +167,21 @@ def scan_today():
                 })
         except:
             continue
-    
+
     if new_entries:
-        # Voeg toe aan bestaande historie
         history.extend(new_entries)
         save_history(history)
-    
-    # Markeer vandaag als gescand
+
     mark_today_scanned()
     return history
 
 def check_bearish_gap():
-    """Retourneer de volledige historie als DataFrame, en de huidige tijd"""
-    history = scan_today()  # scant indien nodig, anders bestaande historie
-    
+    history = scan_today()
     if history:
         df = pd.DataFrame(history)
-        # Sorteer op datum aflopend, dan op gap % aflopend
         df = df.sort_values(['Datum', 'Gap %'], ascending=[False, False])
     else:
         df = pd.DataFrame()
-    
     snapshot_time = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime('%H:%M')
     return df, snapshot_time
 
@@ -139,5 +200,5 @@ def get_market_status():
 
 def get_snapshot_info():
     if is_today_already_scanned():
-        return f"📸 Scan van vandaag uitgevoerd"
+        return "📸 Scan van vandaag uitgevoerd"
     return "🔄 Nog niet gescand vandaag"
