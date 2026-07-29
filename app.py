@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from gap_checker import check_bearish_gaps, get_market_status
 from datetime import datetime
 
@@ -21,24 +20,12 @@ if st.button("🔄 Ververs data", type="primary"):
     st.rerun()
 
 if not df.empty:
-    # Toon laatste datum
     latest_date = df['Datum'].max()
     st.subheader(f"📅 Bearish gaps van {latest_date}")
     c1, c2, c3 = st.columns(3)
     c1.metric("Aantal", len(df))
     c2.metric("Gem. gap %", f"{df['Gap %'].mean():.2f}%")
     c3.metric("Gem. candle %", f"{df['Candle %'].mean():.2f}%")
-
-    st.divider()
-    st.subheader("📊 Gap % per aandeel")
-    fig = px.bar(df, x='Ticker', y='Gap %', color='Exchange',
-                 text='Gap %', barmode='group',
-                 color_discrete_map={"AEX": "red", "NYSE/NASDAQ": "blue"})
-    fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
-    fig.update_layout(height=500, xaxis_title="", yaxis_title="Gap Percentage",
-                      plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                      font=dict(color='white'))
-    st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     st.subheader("📋 Alle Bearish Gaps")
