@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from gap_checker import check_bearish_gap, get_market_status, get_snapshot_info, backfill_history
+from gap_checker import check_bearish_gap, get_market_status, get_snapshot_info
 from datetime import datetime
 
 st.set_page_config(page_title="AEX+US Bearish Gap Scanner", page_icon="🐻", layout="wide")
@@ -10,7 +10,6 @@ st.markdown('<p style="font-size:2.5rem;font-weight:bold;color:#FF4B4B;">🐻 Be
 status = get_market_status()
 df, snapshot_time = check_bearish_gap()
 
-# Vier kolommen: AEX, US, tijd, aantal signalen
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("AEX", status["AEX"])
 col2.metric("US Beurzen", status["US"])
@@ -19,17 +18,8 @@ col4.metric("Historie", f"{len(df)} signalen")
 
 st.divider()
 
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("🔄 Ververs data", type="primary", key="refresh"):
-        st.rerun()
-with c2:
-    if not st.session_state.get('backfill_done', False):
-        if st.button("📥 Backfill vanaf 20 juli"):
-            with st.spinner("Historische data ophalen... Dit kan enkele minuten duren."):
-                backfill_history("2026-07-20")
-                st.session_state['backfill_done'] = True
-            st.rerun()
+if st.button("🔄 Ververs data", type="primary"):
+    st.rerun()
 
 if not df.empty:
     latest_date = df['Datum'].max()
@@ -70,7 +60,7 @@ if not df.empty:
                        file_name=f"bearish_gaps_history_{datetime.now().strftime('%Y%m%d')}.csv",
                        mime="text/csv")
 else:
-    st.success("✅ Nog geen bearish gap signalen gevonden.")
+    st.warning("⚠️ Nog geen bearish gap signalen gevonden. De data wordt ververst bij elke start.")
     st.markdown("""
     ### 📖 Bearish Gap + Bearish Candle
     - **Dag N+1 open < laagste koers Dag N** (gap down)

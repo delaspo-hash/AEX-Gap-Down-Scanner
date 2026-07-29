@@ -5,7 +5,6 @@ import json
 import os
 import time
 
-# === CONSTANTEN ===
 AEX_TICKERS = [
     "ADYEN.AS", "AGN.AS", "AKZA.AS", "ASM.AS", "ASML.AS",
     "BESI.AS", "DSM.AS", "EXO.AS", "HEIA.AS", "HEIN.AS",
@@ -15,12 +14,9 @@ AEX_TICKERS = [
 ]
 
 HISTORY_FILE = "history.json"
-TODAY_FLAG = "snapshot_done.json"
 TICKER_CACHE = "ticker_cache.json"
-DATA_CACHE_FILE = "daily_data_cache.json"
-BACKFILL_DONE_FLAG = "backfill_done.json"
 
-# === TICKERLIJSTEN (stabiele bron) ===
+# --- TICKERLIJSTEN ---
 def fetch_sp500_tickers():
     try:
         url = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/master/data/constituents.csv"
@@ -28,8 +24,7 @@ def fetch_sp500_tickers():
         return [t.replace('.', '-') for t in df['Symbol'].tolist()]
     except:
         return ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "BRK-B", "JPM", "V",
-                "JNJ", "WMT", "PG", "MA", "UNH", "HD", "BAC", "DIS", "ADBE", "CRM",
-                "NFLX", "INTC", "CSCO", "VZ", "KO", "PEP", "MRK", "ABT", "WFC", "TMO"]
+                "JNJ", "WMT", "PG", "MA", "UNH", "HD", "BAC", "DIS", "ADBE", "CRM"]
 
 def fetch_nasdaq100_tickers():
     try:
@@ -54,58 +49,28 @@ def get_all_us_tickers():
         json.dump({'date': datetime.now(timezone.utc).strftime('%Y-%m-%d'), 'tickers': all_us}, f)
     return all_us
 
-# === BATCH DOWNLOAD (SUPERSNEL) ===
-def download_all_tickers_data(tickers, period="10d"):
-    """
-    Download dagelijkse data voor een lijst tickers in één batch.
-    Retourneert dict: {ticker: DataFrame} of leeg bij fout.
-    """
+# --- DATA OPHALEN (10 dagen) ---
+def download_all_tickers_data(tickers):
+    """Batch download van de laatste 10 dagen voor een lijst tickers."""
     if not tickers:
         return {}
     try:
         print(f"Download batch van {len(tickers)} tickers...")
-        data = yf.download(tickers, period=period, interval="1d", progress=False, group_by='ticker')
-        # Als er maar 1 ticker is, retourneert yfinance een enkel DataFrame, dus normaliseren
+        data = yf.download(tickers, period="10d", interval="1d", progress=False, group_by='ticker')
         if len(tickers) == 1:
             data = {tickers[0]: data}
-        else:
-            # data is dict van DataFrame per ticker
-            pass
         return data
     except Exception as e:
-        print(f"Batch download mislukt: {e}")
+        print(f"Batch mislukt: {e}")
         return {}
 
-# === DAGCACHE VOOR RAUWE DATA ===
-def load_daily_cache():
-    """Laad de cache van vandaag (dict met ticker -> DataFrame in JSON niet mogelijk, dus slaan we de ruwe data over)"""
-    # We kunnen beter een simpele globale variabele in memory gebruiken in Streamlit,
-    # maar voor persistente cache tussen runs slaan we niets groots op.
-    return None
+def get_all_data():
+    """Haal data op voor AEX + US tickers (10 dagen)."""
+    us = get_all_us_tickers()
+    all_tickers = AEX_TICKERS + us
+    return download_all_tickers_data(all_tickers)
 
-# We gebruiken een module-level variabele voor data van deze sessie
-_session_data_cache = None
-_session_cache_date = None
-
-def get_all_data_for_today():
-    """
-    Haal alle benodigde koersdata op (AEX+US) en cache het in het geheugen voor deze sessie.
-    """
-    global _session_data_cache, _session_cache_date
-    today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    if _session_data_cache is not None and _session_cache_date == today_str:
-        return _session_data_cache
-
-    us_tickers = get_all_us_tickers()
-    all_tickers = AEX_TICKERS + us_tickers
-
-    # Download in één batch
-    raw_data = download_all_tickers_data(all_tickers, period="10d")
-    _session_data_cache = raw_data
-    _session_cache_date = today_str
-    return raw_data
-
-# === HISTORIE BEHEREN ===
+# --- HISTORIE BEHEREN ---
 def load_history():
     if not os.path.exists(HISTORY_FILE):
         return []
@@ -116,67 +81,38 @@ def save_history(history):
     with open(HISTORY_FILE, 'w') as f:
         json.dump(history, f, indent=2)
 
-def is_today_already_scanned():
-    if not os.path.exists(TODAY_FLAG):
-        return False
-    with open(TODAY_FLAG, 'r') as f:
-        data = json.load(f)
-    return data.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d')
-
-def mark_today_scanned():
-    with open(TODAY_FLAG, 'w') as f:
-        json.dump({'date': datetime.now(timezone.utc).strftime('%Y-%m-%d')}, f)
-
-def is_backfill_done():
-    if not os.path.exists(BACKFILL_DONE_FLAG):
-        return False
-    with open(BACKFILL_DONE_FLAG, 'r') as f:
-        data = json.load(f)
-    return data.get('done', False)
-
-def mark_backfill_done():
-    with open(BACKFILL_DONE_FLAG, 'w') as f:
-        json.dump({'done': True}, f)
-
-# === BACKFILL (eenmalig) ===
-def backfill_history(start_date_str="2026-07-20"):
-    if is_backfill_done():
-        return
-    end_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
-    print(f"Backfill van {start_date_str} tot {end_date}...")
-    us_tickers = get_all_us_tickers()
-    all_tickers = AEX_TICKERS + us_tickers
-
-    # Batch download voor backfill: 1 call per dag? Liever een range.
-    # We downloaden van start_date tot end_date voor alle tickers tegelijk.
-    try:
-        data = yf.download(all_tickers, start=start_date_str, end=end_date, progress=False, group_by='ticker')
-    except:
-        data = {}
-
+# --- SCAN ALLE BESCHIKBARE DATA (laatste 10 dagen) ---
+def scan_all():
+    """Scan alle tickers over de laatste 10 dagen en voeg nieuwe signalen toe aan history."""
     history = load_history()
-    existing_set = set()
+    existing = set()
     for e in history:
-        existing_set.add((e['Ticker'], e['Datum']))
+        existing.add((e['Ticker'], e['Datum']))
+
+    raw_data = get_all_data()
     new_entries = []
 
-    if isinstance(data, dict):
-        for ticker, df in data.items():
-            if df.empty or len(df) < 2:
-                continue
+    for ticker, df in raw_data.items():
+        if df is None or len(df) < 2:
+            continue
+        try:
+            # Zorg voor juiste kolomnamen (soms MultiIndex)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.droplevel(1)
+            # Itereer over dagen
             for i in range(1, len(df)):
-                current_day = df.index[i]
-                prev_day = df.iloc[i-1]
-                low_prev = float(prev_day['Low'].iloc[0]) if not isinstance(prev_day['Low'], float) else float(prev_day['Low'].iloc[0])
-                open_curr = float(curr_day['Open'].iloc[0])
-                close_curr = float(curr_day['Close'].iloc[0])
-                # (rest van de code zoals eerder)
+                prev = df.iloc[i-1]
+                curr = df.iloc[i]
+                low_prev = float(prev['Low'])
+                open_curr = float(curr['Open'])
+                close_curr = float(curr['Close'])
+
                 if open_curr < low_prev and close_curr < open_curr:
                     gap_pct = ((low_prev - open_curr) / low_prev) * 100
                     candle_pct = ((close_curr - open_curr) / open_curr) * 100
-                    date_str = current_day.strftime('%Y-%m-%d')
+                    date_str = df.index[i].strftime('%Y-%m-%d')
                     ticker_clean = ticker.replace('.AS', '')
-                    if (ticker_clean, date_str) not in existing_set:
+                    if (ticker_clean, date_str) not in existing:
                         exchange = "AEX" if ticker in AEX_TICKERS else "NYSE/NASDAQ"
                         new_entries.append({
                             'Datum': date_str,
@@ -188,64 +124,22 @@ def backfill_history(start_date_str="2026-07-20"):
                             'Gap %': round(gap_pct, 2),
                             'Candle %': round(candle_pct, 2)
                         })
-                        existing_set.add((ticker_clean, date_str))
-    if new_entries:
-        history.extend(new_entries)
-        save_history(history)
-    mark_backfill_done()
-
-# === DAGELIJKSE SCAN (supersnel) ===
-def scan_today():
-    history = load_history()
-    if is_today_already_scanned():
-        return history
-
-    raw_data = get_all_data_for_today()
-    new_entries = []
-
-    for ticker, df in raw_data.items():
-        if df is None or len(df) < 3:
-            continue
-        try:
-            dag_n = df.iloc[-3]
-            dag_n1 = df.iloc[-2]
-            low_n = float(dag_n['Low'].iloc[0])
-            open_n1 = float(dag_n1['Open'].iloc[0])
-            close_n1 = float(dag_n1['Close'].iloc[0])
-
-            if open_n1 < low_n and close_n1 < open_n1:
-                gap_pct = ((low_n - open_n1) / low_n) * 100
-                candle_pct = ((close_n1 - open_n1) / open_n1) * 100
-                gap_date = dag_n1.name
-                gap_date_str = gap_date.strftime('%Y-%m-%d') if hasattr(gap_date, 'strftime') else str(gap_date)[:10]
-                exchange = "AEX" if ticker in AEX_TICKERS else "NYSE/NASDAQ"
-                ticker_clean = ticker.replace('.AS', '')
-                new_entries.append({
-                    'Datum': gap_date_str,
-                    'Ticker': ticker_clean,
-                    'Exchange': exchange,
-                    'Dag N Low': round(low_n, 2),
-                    'N+1 Open': round(open_n1, 2),
-                    'N+1 Close': round(close_n1, 2),
-                    'Gap %': round(gap_pct, 2),
-                    'Candle %': round(candle_pct, 2)
-                })
-        except:
+                        existing.add((ticker_clean, date_str))
+        except Exception as e:
+            print(f"Fout bij {ticker}: {e}")
             continue
 
     if new_entries:
         history.extend(new_entries)
         save_history(history)
-
-    mark_today_scanned()
+        print(f"{len(new_entries)} nieuwe signalen toegevoegd.")
+    else:
+        print("Geen nieuwe signalen gevonden.")
     return history
 
-# === HOOFDFUNCTIE ===
+# --- HOOFDFUNCTIE ---
 def check_bearish_gap():
-    # Backfill alleen als nog niet gedaan (doet niets als flag bestaat)
-    if not is_backfill_done():
-        backfill_history("2026-07-20")
-    history = scan_today()
+    history = scan_all()
     if history:
         df = pd.DataFrame(history)
         df = df.sort_values(['Datum', 'Gap %'], ascending=[False, False])
@@ -259,10 +153,8 @@ def get_market_status():
     hour = now.hour
     minute = now.minute
     weekday = now.weekday()
-
     if weekday >= 5:
         return {"AEX": "🔴 Weekend", "US": "🔴 Weekend"}
-
     # AEX 9:00-17:30
     if hour < 9:
         aex = "⏳ AEX nog niet open"
@@ -270,18 +162,14 @@ def get_market_status():
         aex = "🟢 AEX open"
     else:
         aex = "🔴 AEX gesloten"
-
-    # US 15:30-22:00 NL tijd
+    # US 15:30-22:00
     if hour < 15 or (hour == 15 and minute < 30):
         us = "⏳ US nog niet open"
     elif hour < 22:
         us = "🟢 US open"
     else:
         us = "🔴 US gesloten"
-
     return {"AEX": aex, "US": us}
 
 def get_snapshot_info():
-    if is_today_already_scanned():
-        return "📸 Scan van vandaag uitgevoerd"
-    return "🔄 Scan wordt uitgevoerd..."
+    return "📊 Altijd actuele data (laatste 10 dagen)"
