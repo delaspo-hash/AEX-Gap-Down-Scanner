@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import json
 import os
+import time
 
 # === CONSTANTEN ===
 AEX_TICKERS = [
@@ -16,44 +17,36 @@ AEX_TICKERS = [
 HISTORY_FILE = "history.json"
 TODAY_FLAG = "snapshot_done.json"
 TICKER_CACHE = "ticker_cache.json"
+DATA_CACHE_FILE = "daily_data_cache.json"
 BACKFILL_DONE_FLAG = "backfill_done.json"
 
-# === BETERE TICKERLIJSTEN (stabiele bronnen + fallback) ===
+# === TICKERLIJSTEN (stabiele bron) ===
 def fetch_sp500_tickers():
-    """Haal S&P 500 tickers van GitHub CSV (altijd beschikbaar)"""
     try:
         url = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/master/data/constituents.csv"
         df = pd.read_csv(url)
-        tickers = df['Symbol'].tolist()
-        return [t.replace('.', '-') for t in tickers]
+        return [t.replace('.', '-') for t in df['Symbol'].tolist()]
     except:
-        # Fallback: 30 grootste S&P 500 bedrijven
-        return ["AAPL", "MSFT", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "BRK-B", "JPM", "V",
+        return ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "BRK-B", "JPM", "V",
                 "JNJ", "WMT", "PG", "MA", "UNH", "HD", "BAC", "DIS", "ADBE", "CRM",
                 "NFLX", "INTC", "CSCO", "VZ", "KO", "PEP", "MRK", "ABT", "WFC", "TMO"]
 
 def fetch_nasdaq100_tickers():
-    """Haal Nasdaq-100 tickers van GitHub CSV"""
     try:
         url = "https://raw.githubusercontent.com/arinb23/Nasdaq-100-Companies/main/nasdaq_100_tickers.csv"
         df = pd.read_csv(url)
         col = 'Symbol' if 'Symbol' in df.columns else 'Ticker'
-        tickers = df[col].tolist()
-        return [t.replace('.', '-') for t in tickers if isinstance(t, str)]
+        return [t.replace('.', '-') for t in df[col].tolist() if isinstance(t, str)]
     except:
-        # Fallback: 30 grootste Nasdaq-100 bedrijven
-        return ["NVDA", "AVGO", "AMD", "QCOM", "TXN", "AMAT", "MU", "ADI", "LRCX", "KLAC",
-                "MRNA", "GILD", "REGN", "VRTX", "BIIB", "ILMN", "ADP", "CTAS", "ROST", "MAR"]
+        return ["NVDA", "AVGO", "AMD", "QCOM", "TXN", "AMAT", "MU", "ADI", "LRCX", "KLAC"]
 
 def get_all_us_tickers():
-    """S&P500 + Nasdaq-100, gecached voor vandaag"""
     cache = {}
     if os.path.exists(TICKER_CACHE):
         with open(TICKER_CACHE, 'r') as f:
             cache = json.load(f)
         if cache.get('date') == datetime.now(timezone.utc).strftime('%Y-%m-%d'):
             return cache['tickers']
-
     sp500 = fetch_sp500_tickers()
     nasdaq100 = fetch_nasdaq100_tickers()
     all_us = list(set(sp500 + nasdaq100))
@@ -61,26 +54,56 @@ def get_all_us_tickers():
         json.dump({'date': datetime.now(timezone.utc).strftime('%Y-%m-%d'), 'tickers': all_us}, f)
     return all_us
 
-# === DATA OPHALEN ===
-def get_stock_data(ticker):
-    """Haal 10 dagen koersdata op (voor dagelijkse scan)"""
+# === BATCH DOWNLOAD (SUPERSNEL) ===
+def download_all_tickers_data(tickers, period="10d"):
+    """
+    Download dagelijkse data voor een lijst tickers in één batch.
+    Retourneert dict: {ticker: DataFrame} of leeg bij fout.
+    """
+    if not tickers:
+        return {}
     try:
-        data = yf.download(ticker, period="10d", interval="1d", progress=False)
-        if len(data) < 3:
-            return None
+        print(f"Download batch van {len(tickers)} tickers...")
+        data = yf.download(tickers, period=period, interval="1d", progress=False, group_by='ticker')
+        # Als er maar 1 ticker is, retourneert yfinance een enkel DataFrame, dus normaliseren
+        if len(tickers) == 1:
+            data = {tickers[0]: data}
+        else:
+            # data is dict van DataFrame per ticker
+            pass
         return data
-    except:
-        return None
+    except Exception as e:
+        print(f"Batch download mislukt: {e}")
+        return {}
 
-def get_stock_data_range(ticker, start_date, end_date):
-    """Haal data op tussen twee datums (voor backfill)"""
-    try:
-        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
-        if data.empty or len(data) < 2:
-            return None
-        return data
-    except:
-        return None
+# === DAGCACHE VOOR RAUWE DATA ===
+def load_daily_cache():
+    """Laad de cache van vandaag (dict met ticker -> DataFrame in JSON niet mogelijk, dus slaan we de ruwe data over)"""
+    # We kunnen beter een simpele globale variabele in memory gebruiken in Streamlit,
+    # maar voor persistente cache tussen runs slaan we niets groots op.
+    return None
+
+# We gebruiken een module-level variabele voor data van deze sessie
+_session_data_cache = None
+_session_cache_date = None
+
+def get_all_data_for_today():
+    """
+    Haal alle benodigde koersdata op (AEX+US) en cache het in het geheugen voor deze sessie.
+    """
+    global _session_data_cache, _session_cache_date
+    today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    if _session_data_cache is not None and _session_cache_date == today_str:
+        return _session_data_cache
+
+    us_tickers = get_all_us_tickers()
+    all_tickers = AEX_TICKERS + us_tickers
+
+    # Download in één batch
+    raw_data = download_all_tickers_data(all_tickers, period="10d")
+    _session_data_cache = raw_data
+    _session_cache_date = today_str
+    return raw_data
 
 # === HISTORIE BEHEREN ===
 def load_history():
@@ -115,51 +138,44 @@ def mark_backfill_done():
     with open(BACKFILL_DONE_FLAG, 'w') as f:
         json.dump({'done': True}, f)
 
-# === BACKFILL ===
+# === BACKFILL (eenmalig) ===
 def backfill_history(start_date_str="2026-07-20"):
     if is_backfill_done():
         return
-
     end_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
-    print(f"Backfill van {start_date_str} tot {end_date} gestart...")
-
+    print(f"Backfill van {start_date_str} tot {end_date}...")
     us_tickers = get_all_us_tickers()
     all_tickers = AEX_TICKERS + us_tickers
 
+    # Batch download voor backfill: 1 call per dag? Liever een range.
+    # We downloaden van start_date tot end_date voor alle tickers tegelijk.
+    try:
+        data = yf.download(all_tickers, start=start_date_str, end=end_date, progress=False, group_by='ticker')
+    except:
+        data = {}
+
     history = load_history()
     existing_set = set()
-    for entry in history:
-        existing_set.add((entry['Ticker'], entry['Datum']))
-
+    for e in history:
+        existing_set.add((e['Ticker'], e['Datum']))
     new_entries = []
 
-    for ticker in all_tickers:
-        try:
-            fetch_start = (datetime.strptime(start_date_str, '%Y-%m-%d') - timedelta(days=5)).strftime('%Y-%m-%d')
-            data = get_stock_data_range(ticker, fetch_start, end_date)
-            if data is None or len(data) < 2:
+    if isinstance(data, dict):
+        for ticker, df in data.items():
+            if df.empty or len(df) < 2:
                 continue
-
-            start_dt = pd.to_datetime(start_date_str)
-            end_dt = pd.to_datetime(end_date)
-            for i in range(1, len(data)):
-                current_day = data.index[i]
-                if current_day < start_dt or current_day > end_dt:
-                    continue
-
-                prev_day = data.iloc[i-1]
-                curr_day = data.iloc[i]
-
-                low_prev = float(prev_day['Low'].iloc[0])
+            for i in range(1, len(df)):
+                current_day = df.index[i]
+                prev_day = df.iloc[i-1]
+                low_prev = float(prev_day['Low'].iloc[0]) if not isinstance(prev_day['Low'], float) else float(prev_day['Low'].iloc[0])
                 open_curr = float(curr_day['Open'].iloc[0])
                 close_curr = float(curr_day['Close'].iloc[0])
-
+                # (rest van de code zoals eerder)
                 if open_curr < low_prev and close_curr < open_curr:
                     gap_pct = ((low_prev - open_curr) / low_prev) * 100
                     candle_pct = ((close_curr - open_curr) / open_curr) * 100
                     date_str = current_day.strftime('%Y-%m-%d')
                     ticker_clean = ticker.replace('.AS', '')
-
                     if (ticker_clean, date_str) not in existing_set:
                         exchange = "AEX" if ticker in AEX_TICKERS else "NYSE/NASDAQ"
                         new_entries.append({
@@ -173,38 +189,26 @@ def backfill_history(start_date_str="2026-07-20"):
                             'Candle %': round(candle_pct, 2)
                         })
                         existing_set.add((ticker_clean, date_str))
-        except:
-            continue
-
     if new_entries:
         history.extend(new_entries)
         save_history(history)
-        print(f"Backfill voltooid: {len(new_entries)} signalen toegevoegd.")
-    else:
-        print("Backfill: geen nieuwe signalen gevonden.")
-
     mark_backfill_done()
 
-# === DAGELIJKSE SCAN ===
+# === DAGELIJKSE SCAN (supersnel) ===
 def scan_today():
     history = load_history()
     if is_today_already_scanned():
         return history
 
-    us_tickers = get_all_us_tickers()
-    all_tickers = AEX_TICKERS + us_tickers
-
+    raw_data = get_all_data_for_today()
     new_entries = []
 
-    for ticker in all_tickers:
+    for ticker, df in raw_data.items():
+        if df is None or len(df) < 3:
+            continue
         try:
-            data = get_stock_data(ticker)  # gebruikt period="10d"
-            if data is None or len(data) < 3:
-                continue
-
-            dag_n = data.iloc[-3]
-            dag_n1 = data.iloc[-2]
-
+            dag_n = df.iloc[-3]
+            dag_n1 = df.iloc[-2]
             low_n = float(dag_n['Low'].iloc[0])
             open_n1 = float(dag_n1['Open'].iloc[0])
             close_n1 = float(dag_n1['Close'].iloc[0])
@@ -215,9 +219,10 @@ def scan_today():
                 gap_date = dag_n1.name
                 gap_date_str = gap_date.strftime('%Y-%m-%d') if hasattr(gap_date, 'strftime') else str(gap_date)[:10]
                 exchange = "AEX" if ticker in AEX_TICKERS else "NYSE/NASDAQ"
+                ticker_clean = ticker.replace('.AS', '')
                 new_entries.append({
                     'Datum': gap_date_str,
-                    'Ticker': ticker.replace('.AS', ''),
+                    'Ticker': ticker_clean,
                     'Exchange': exchange,
                     'Dag N Low': round(low_n, 2),
                     'N+1 Open': round(open_n1, 2),
@@ -235,9 +240,11 @@ def scan_today():
     mark_today_scanned()
     return history
 
-# === HOOFDFUNCTIE VOOR APP ===
+# === HOOFDFUNCTIE ===
 def check_bearish_gap():
-    backfill_history("2026-07-20")  # doet niets als al gedaan
+    # Backfill alleen als nog niet gedaan (doet niets als flag bestaat)
+    if not is_backfill_done():
+        backfill_history("2026-07-20")
     history = scan_today()
     if history:
         df = pd.DataFrame(history)
@@ -248,24 +255,24 @@ def check_bearish_gap():
     return df, snapshot_time
 
 def get_market_status():
-    """Aparte status voor AEX en US beurzen (NL tijd)"""
     now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
+    minute = now.minute
     weekday = now.weekday()
 
     if weekday >= 5:
         return {"AEX": "🔴 Weekend", "US": "🔴 Weekend"}
 
-    # AEX: 9:00 - 17:30
+    # AEX 9:00-17:30
     if hour < 9:
         aex = "⏳ AEX nog niet open"
-    elif hour < 17:
+    elif hour < 17 or (hour == 17 and minute < 30):
         aex = "🟢 AEX open"
     else:
         aex = "🔴 AEX gesloten"
 
-    # US: 15:30 - 22:00 (gebruik float voor half uur)
-    if hour < 15 or (hour == 15 and datetime.now().minute < 30):
+    # US 15:30-22:00 NL tijd
+    if hour < 15 or (hour == 15 and minute < 30):
         us = "⏳ US nog niet open"
     elif hour < 22:
         us = "🟢 US open"
@@ -277,4 +284,4 @@ def get_market_status():
 def get_snapshot_info():
     if is_today_already_scanned():
         return "📸 Scan van vandaag uitgevoerd"
-    return "🔄 Nog niet gescand vandaag"
+    return "🔄 Scan wordt uitgevoerd..."
