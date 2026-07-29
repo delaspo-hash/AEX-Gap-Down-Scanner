@@ -18,27 +18,35 @@ TODAY_FLAG = "snapshot_done.json"
 TICKER_CACHE = "ticker_cache.json"
 BACKFILL_DONE_FLAG = "backfill_done.json"
 
-# === TICKERLIJSTEN (S&P 500 & Nasdaq-100) ===
+# === BETERE TICKERLIJSTEN (stabiele bronnen + fallback) ===
 def fetch_sp500_tickers():
+    """Haal S&P 500 tickers van GitHub CSV (altijd beschikbaar)"""
     try:
-        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        tables = pd.read_html(url)
-        return [t.replace('.', '-') for t in tables[0]['Symbol'].tolist()]
+        url = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/master/data/constituents.csv"
+        df = pd.read_csv(url)
+        tickers = df['Symbol'].tolist()
+        return [t.replace('.', '-') for t in tickers]
     except:
-        return []
+        # Fallback: 30 grootste S&P 500 bedrijven
+        return ["AAPL", "MSFT", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "BRK-B", "JPM", "V",
+                "JNJ", "WMT", "PG", "MA", "UNH", "HD", "BAC", "DIS", "ADBE", "CRM",
+                "NFLX", "INTC", "CSCO", "VZ", "KO", "PEP", "MRK", "ABT", "WFC", "TMO"]
 
 def fetch_nasdaq100_tickers():
+    """Haal Nasdaq-100 tickers van GitHub CSV"""
     try:
-        url = "https://en.wikipedia.org/wiki/Nasdaq-100"
-        for table in pd.read_html(url):
-            if 'Ticker' in table.columns or 'Symbol' in table.columns:
-                col = 'Ticker' if 'Ticker' in table.columns else 'Symbol'
-                return [t.replace('.', '-') for t in table[col].tolist() if isinstance(t, str)]
-        return []
+        url = "https://raw.githubusercontent.com/arinb23/Nasdaq-100-Companies/main/nasdaq_100_tickers.csv"
+        df = pd.read_csv(url)
+        col = 'Symbol' if 'Symbol' in df.columns else 'Ticker'
+        tickers = df[col].tolist()
+        return [t.replace('.', '-') for t in tickers if isinstance(t, str)]
     except:
-        return []
+        # Fallback: 30 grootste Nasdaq-100 bedrijven
+        return ["NVDA", "AVGO", "AMD", "QCOM", "TXN", "AMAT", "MU", "ADI", "LRCX", "KLAC",
+                "MRNA", "GILD", "REGN", "VRTX", "BIIB", "ILMN", "ADP", "CTAS", "ROST", "MAR"]
 
 def get_all_us_tickers():
+    """S&P500 + Nasdaq-100, gecached voor vandaag"""
     cache = {}
     if os.path.exists(TICKER_CACHE):
         with open(TICKER_CACHE, 'r') as f:
@@ -53,9 +61,19 @@ def get_all_us_tickers():
         json.dump({'date': datetime.now(timezone.utc).strftime('%Y-%m-%d'), 'tickers': all_us}, f)
     return all_us
 
-# === DATA OPHALEN VOOR PERIODE ===
+# === DATA OPHALEN ===
+def get_stock_data(ticker):
+    """Haal 10 dagen koersdata op (voor dagelijkse scan)"""
+    try:
+        data = yf.download(ticker, period="10d", interval="1d", progress=False)
+        if len(data) < 3:
+            return None
+        return data
+    except:
+        return None
+
 def get_stock_data_range(ticker, start_date, end_date):
-    """Haal dagelijkse data op tussen start en end (inclusief)"""
+    """Haal data op tussen twee datums (voor backfill)"""
     try:
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)
         if data.empty or len(data) < 2:
@@ -97,14 +115,10 @@ def mark_backfill_done():
     with open(BACKFILL_DONE_FLAG, 'w') as f:
         json.dump({'done': True}, f)
 
-# === BACKFILL: VANAF EEN BEPAALDE DATUM TOT GISTEREN ===
+# === BACKFILL ===
 def backfill_history(start_date_str="2026-07-20"):
-    """
-    Scan alle dagen van start_date tot gisteren op bearish gap signalen
-    en voeg toe aan history.json (geen duplicaten).
-    """
     if is_backfill_done():
-        return  # al gedaan
+        return
 
     end_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
     print(f"Backfill van {start_date_str} tot {end_date} gestart...")
@@ -113,7 +127,7 @@ def backfill_history(start_date_str="2026-07-20"):
     all_tickers = AEX_TICKERS + us_tickers
 
     history = load_history()
-    existing_set = set()  # voorkom duplicaten
+    existing_set = set()
     for entry in history:
         existing_set.add((entry['Ticker'], entry['Datum']))
 
@@ -121,20 +135,16 @@ def backfill_history(start_date_str="2026-07-20"):
 
     for ticker in all_tickers:
         try:
-            # Haal data op van start_date min 5 dagen tot vandaag
             fetch_start = (datetime.strptime(start_date_str, '%Y-%m-%d') - timedelta(days=5)).strftime('%Y-%m-%d')
             data = get_stock_data_range(ticker, fetch_start, end_date)
             if data is None or len(data) < 2:
                 continue
 
-            # Loop over alle dagen vanaf start_date tot end_date
             start_dt = pd.to_datetime(start_date_str)
             end_dt = pd.to_datetime(end_date)
-            for i in range(len(data)):
+            for i in range(1, len(data)):
                 current_day = data.index[i]
                 if current_day < start_dt or current_day > end_dt:
-                    continue
-                if i == 0:  # geen vorige dag beschikbaar
                     continue
 
                 prev_day = data.iloc[i-1]
@@ -169,13 +179,13 @@ def backfill_history(start_date_str="2026-07-20"):
     if new_entries:
         history.extend(new_entries)
         save_history(history)
-        print(f"Backfill voltooid: {len(new_entries)} nieuwe signalen toegevoegd.")
+        print(f"Backfill voltooid: {len(new_entries)} signalen toegevoegd.")
     else:
         print("Backfill: geen nieuwe signalen gevonden.")
 
     mark_backfill_done()
 
-# === DAGELIJKSE SCAN (alleen vandaag) ===
+# === DAGELIJKSE SCAN ===
 def scan_today():
     history = load_history()
     if is_today_already_scanned():
@@ -185,11 +195,10 @@ def scan_today():
     all_tickers = AEX_TICKERS + us_tickers
 
     new_entries = []
-    today_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
     for ticker in all_tickers:
         try:
-            data = get_stock_data_range(ticker, None, None)  # gebruik standaard period
+            data = get_stock_data(ticker)  # gebruikt period="10d"
             if data is None or len(data) < 3:
                 continue
 
@@ -226,33 +235,44 @@ def scan_today():
     mark_today_scanned()
     return history
 
-# === MAIN FUNCTIE VOOR APP ===
+# === HOOFDFUNCTIE VOOR APP ===
 def check_bearish_gap():
-    # Altijd eerst backfill proberen (doet niets als al gedaan)
-    backfill_history("2026-07-20")
-
+    backfill_history("2026-07-20")  # doet niets als al gedaan
     history = scan_today()
     if history:
         df = pd.DataFrame(history)
         df = df.sort_values(['Datum', 'Gap %'], ascending=[False, False])
     else:
         df = pd.DataFrame()
-
     snapshot_time = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime('%H:%M')
     return df, snapshot_time
 
 def get_market_status():
+    """Aparte status voor AEX en US beurzen (NL tijd)"""
     now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
     weekday = now.weekday()
+
     if weekday >= 5:
-        return "🔴 Weekend - Beurs gesloten"
+        return {"AEX": "🔴 Weekend", "US": "🔴 Weekend"}
+
+    # AEX: 9:00 - 17:30
     if hour < 9:
-        return "⏳ Beurs nog niet open"
+        aex = "⏳ AEX nog niet open"
     elif hour < 17:
-        return "🟢 Beurs is open"
+        aex = "🟢 AEX open"
     else:
-        return "🔴 Beurs gesloten"
+        aex = "🔴 AEX gesloten"
+
+    # US: 15:30 - 22:00 (gebruik float voor half uur)
+    if hour < 15 or (hour == 15 and datetime.now().minute < 30):
+        us = "⏳ US nog niet open"
+    elif hour < 22:
+        us = "🟢 US open"
+    else:
+        us = "🔴 US gesloten"
+
+    return {"AEX": aex, "US": us}
 
 def get_snapshot_info():
     if is_today_already_scanned():

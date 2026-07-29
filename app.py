@@ -10,20 +10,20 @@ st.markdown('<p style="font-size:2.5rem;font-weight:bold;color:#FF4B4B;">🐻 Be
 status = get_market_status()
 df, snapshot_time = check_bearish_gap()
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Status", status)
-col2.metric("Scan tijd", f"📸 {snapshot_time}")
-col3.metric("Historie", f"{len(df)} signalen")
+# Vier kolommen: AEX, US, tijd, aantal signalen
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("AEX", status["AEX"])
+col2.metric("US Beurzen", status["US"])
+col3.metric("Scan tijd", f"📸 {snapshot_time}")
+col4.metric("Historie", f"{len(df)} signalen")
 
 st.divider()
 
-# Knoppen naast elkaar
 c1, c2 = st.columns(2)
 with c1:
     if st.button("🔄 Ververs data", type="primary", key="refresh"):
         st.rerun()
 with c2:
-    # Alleen tonen als backfill nog niet gedaan is
     if not st.session_state.get('backfill_done', False):
         if st.button("📥 Backfill vanaf 20 juli"):
             with st.spinner("Historische data ophalen... Dit kan enkele minuten duren."):
