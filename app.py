@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="AEX+US Bearish Gap Scanner", page_icon="🐻", layout="wide")
 
-# Lichte tabelstijl voor leesbaarheid
+# Lichte achtergrond forceren voor de tabel
 st.markdown("""
 <style>
     .gap-table {
@@ -29,7 +29,7 @@ st.markdown("""
     }
     .dubbele-gap {
         font-weight: bold;
-        background-color: #ffe6e6;
+        background-color: #ffe6e6;  /* lichtrood */
     }
     .bearish-gap {
         background-color: white;
@@ -55,7 +55,7 @@ if st.button("🔄 Ververs data", type="primary"):
 if not df.empty:
     st.subheader("📋 Signalen")
 
-    # HTML‑tabel bouwen met vetgedrukte dubbele gaps
+    # HTML-tabel bouwen met lichte styling
     html = '<table class="gap-table"><thead><tr>'
     for col in df.columns:
         html += f'<th>{col}</th>'
@@ -76,9 +76,10 @@ if not df.empty:
     html += '</tbody></table>'
 
     st.markdown(html, unsafe_allow_html=True)
+
     st.caption("💡 **Dubbele Gap Down**-signalen zijn **vet** met een lichtrode achtergrond.")
 
-    # Download CSV
+    # Download
     csv = df.to_csv(index=False)
     st.download_button("📥 Download als CSV", data=csv,
                        file_name=f"bearish_signals_{datetime.now().strftime('%Y%m%d')}.csv",
@@ -92,4 +93,4 @@ else:
     """)
 
 st.divider()
-st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX + 100 grootste US-bedrijven")
+st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX + 100 US-bedrijven")
