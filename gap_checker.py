@@ -1,13 +1,15 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+import time
 
+# AEX_TICKERS: verouderde symbolen vervangen
 AEX_TICKERS = [
     "ADYEN.AS", "AGN.AS", "AKZA.AS", "ASM.AS", "ASML.AS",
-    "BESI.AS", "DSM.AS", "EXO.AS", "HEIA.AS", "HEIN.AS",
-    "IMCD.AS", "INGA.AS", "KPN.AS", "MT.AS", "PHIA.AS",
-    "PRX.AS", "RAND.AS", "REL.AS", "SHELL.AS", "TKWY.AS",
-    "UNA.AS", "VPK.AS", "WKL.AS"
+    "BESI.AS", "DSFIR.AS", "EXO.AS", "HEIA.AS", "IMCD.AS",  # DSM.AS -> DSFIR.AS, HEIN.AS verwijderd (foutief)
+    "INGA.AS", "KPN.AS", "MT.AS", "PHIA.AS", "PRX.AS",
+    "RAND.AS", "REN.AS", "SHELL.AS", "TKAY.AS", "UNA.AS",   # REL.AS -> REN.AS, TKWY.AS -> TKAY.AS
+    "VPK.AS", "WKL.AS"
 ]
 
 US_TICKERS = [
@@ -24,7 +26,11 @@ US_TICKERS = [
 ]
 
 def fetch_ticker_data(tickers, period="5d"):
-    """Download batch of individueel, retourneert dict {ticker: DataFrame}"""
+    """
+    Downloadt data voor een lijst tickers in één batch.
+    Geen fallback naar per-ticker om rate-limiting te voorkomen.
+    Retourneert dict {ticker: DataFrame} of leeg bij fout.
+    """
     if not tickers:
         return {}
     try:
@@ -33,24 +39,16 @@ def fetch_ticker_data(tickers, period="5d"):
             data = {tickers[0]: data}
         if data and any(not df.empty for df in data.values()):
             return data
-    except:
+    except Exception as e:
         pass
-    # fallback per ticker
-    result = {}
-    for t in tickers:
-        try:
-            df = yf.download(t, period=period, interval="1d", progress=False)
-            if not df.empty:
-                result[t] = df
-        except:
-            continue
-    return result
+    # Geen per-ticker fallback -> voorkomt rate limiting
+    return {}
 
 def scan_all_patterns():
     """
     Scant op twee patronen:
-    1. Bearish Gap (bestaand): N+1 open < N low én N+1 close < N+1 open
-    2. Dubbele Gap Down (nieuw): N+1 high < N low én N+2 open < N low
+    1. Bearish Gap: N+1 open < N low én N+1 close < N+1 open
+    2. Dubbele Gap Down: N+1 high < N low én N+2 open < N low
     Retourneert DataFrame met alle signalen en kolom 'Signaaltype'.
     """
     all_tickers = AEX_TICKERS + US_TICKERS
@@ -60,6 +58,10 @@ def scan_all_patterns():
     for i in range(0, len(all_tickers), batch_size):
         batch = all_tickers[i:i+batch_size]
         data = fetch_ticker_data(batch, period="5d")
+        # Kleine pauze tussen batches om rate limiting te voorkomen
+        if i + batch_size < len(all_tickers):
+            time.sleep(1)
+
         for ticker, df in data.items():
             if df is None or len(df) < 3:
                 continue
@@ -69,24 +71,24 @@ def scan_all_patterns():
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
 
-                # Gebruik de laatste drie voltooide dagen: N (index -3), N+1 (-2), N+2 (-1)
                 if len(df) < 3:
                     continue
                 dag_n = df.iloc[-3]
                 dag_n1 = df.iloc[-2]
-                dag_n2 = df.iloc[-1]   # dit is gisteren
+                dag_n2 = df.iloc[-1]   # meest recente volledige dag
 
                 low_n = float(dag_n['Low'])
                 open_n1 = float(dag_n1['Open'])
                 close_n1 = float(dag_n1['Close'])
                 high_n1 = float(dag_n1['High'])
                 open_n2 = float(dag_n2['Open'])
-                close_n2 = float(dag_n2['Close'])
+                # close_n2 wordt niet gebruikt in patronen
                 date_n1 = dag_n1.name.strftime('%Y-%m-%d') if hasattr(dag_n1.name, 'strftime') else str(dag_n1.name)[:10]
+                date_n2 = dag_n2.name.strftime('%Y-%m-%d') if hasattr(dag_n2.name, 'strftime') else str(dag_n2.name)[:10]
                 exchange = "AEX" if ticker.endswith('.AS') else "NYSE/NASDAQ"
                 ticker_clean = ticker.replace('.AS', '')
 
-                # Patroon 1: Bearish Gap (open N+1 < low N, close N+1 < open N+1)
+                # Patroon 1: Bearish Gap
                 if open_n1 < low_n and close_n1 < open_n1:
                     gap_pct = ((low_n - open_n1) / low_n) * 100
                     candle_pct = ((close_n1 - open_n1) / open_n1) * 100
@@ -102,19 +104,19 @@ def scan_all_patterns():
                         'Signaaltype': 'Bearish Gap'
                     })
 
-                # Patroon 2: Dubbele Gap Down (high N+1 < low N, open N+2 < low N)
+                # Patroon 2: Dubbele Gap Down
                 if high_n1 < low_n and open_n2 < low_n:
-                    gap_pct_n1 = ((low_n - open_n1) / low_n) * 100  # gap van N+1
-                    gap_pct_n2 = ((low_n - open_n2) / low_n) * 100  # gap van N+2
+                    gap_pct_n2 = ((low_n - open_n2) / low_n) * 100
+                    gap_pct_n1 = ((low_n - open_n1) / low_n) * 100
                     results.append({
                         'Ticker': ticker_clean,
-                        'Datum': f"{date_n1} → {dag_n2.name.strftime('%Y-%m-%d') if hasattr(dag_n2.name, 'strftime') else str(dag_n2.name)[:10]}",
+                        'Datum': f"{date_n1} → {date_n2}",
                         'Exchange': exchange,
                         'Dag N Low': round(low_n, 2),
                         'N+1 Open': round(open_n1, 2),
                         'N+1 Close': round(close_n1, 2),
-                        'Gap %': round(gap_pct_n2, 2),   # toon de tweede gap
-                        'Candle %': round(gap_pct_n1, 2), # eerste gap
+                        'Gap %': round(gap_pct_n2, 2),
+                        'Candle %': round(gap_pct_n1, 2),
                         'Signaaltype': 'Dubbele Gap Down'
                     })
             except Exception as e:
