@@ -1,0 +1,13 @@
+[
+  {
+    "Ticker": "DDOG",
+    "Datum": "2026-08-06 \u2192 2026-08-07",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N Low": 283.0,
+    "N+1 Open": 227.45,
+    "N+1 Close": 229.29,
+    "Gap %": 16.96,
+    "Candle %": 19.63,
+    "Signaaltype": "Dubbele Gap Down"
+  }
+]
