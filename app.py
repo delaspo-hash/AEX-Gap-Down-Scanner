@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 from gap_checker import scan_all_patterns, get_market_status
 from datetime import datetime
+import json
+import os
+
+PERSISTENT_FILE = "verwijderd.json"
 
 st.set_page_config(page_title="AEX+US Bearish Gap Scanner", page_icon="🐻", layout="wide")
 
@@ -41,14 +45,28 @@ st.markdown('<h1 style="color:#FF4B4B;">🐻 Bearish Gap Scanner</h1>', unsafe_a
 
 status = get_market_status()
 
-# --- Initialiseer de set met verwijderde signalen ---
+# --- Laad de persistente verwijderlijst ---
+def load_deleted_set():
+    if os.path.exists(PERSISTENT_FILE):
+        try:
+            with open(PERSISTENT_FILE, 'r') as f:
+                data = json.load(f)
+                return set(data)
+        except:
+            return set()
+    return set()
+
+def save_deleted_set(deleted_set):
+    with open(PERSISTENT_FILE, 'w') as f:
+        json.dump(list(deleted_set), f)
+
+# Initialiseer de set eenmalig per sessie
 if 'deleted_set' not in st.session_state:
-    st.session_state.deleted_set = set()
+    st.session_state.deleted_set = load_deleted_set()
 
 # --- Data ophalen en filteren ---
 if 'df' not in st.session_state or st.button("🔄 Ververs data", type="primary"):
     full_df = scan_all_patterns()
-    # Verwijder alle signalen die ooit zijn verwijderd
     if not full_df.empty:
         mask = full_df.apply(
             lambda row: f"{row['Ticker']}|{row['Datum']}|{row['Signaaltype']}" not in st.session_state.deleted_set,
@@ -69,10 +87,20 @@ col3.metric("Signalen", f"{len(df)} vandaag")
 
 st.divider()
 
+# --- Knop om de verwijderlijst te wissen ---
+if st.button("🗑️ Verwijderlijst legen (alle signalen terugzetten)"):
+    st.session_state.deleted_set = set()
+    save_deleted_set(set())
+    # Herlaad de data zonder filter
+    full_df = scan_all_patterns()
+    st.session_state.df = full_df
+    st.success("Verwijderlijst gewist. Alle signalen zijn terug.")
+    st.rerun()
+
 if not df.empty:
     st.subheader("📋 Signalen")
 
-    # --- Multiselect met alleen de huidige signalen ---
+    # Multiselect (alleen huidige signalen)
     labels = [f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" for _, row in df.iterrows()]
     selected_labels = st.multiselect(
         "Selecteer signalen om te verwijderen:",
@@ -80,21 +108,21 @@ if not df.empty:
         key="selected_signals"
     )
 
-    # Verwijderknop
     if st.button("🗑️ Verwijder geselecteerde signalen", disabled=len(selected_labels) == 0):
         st.session_state.confirm_delete = True
         st.rerun()
 
-    # Popup bevestiging
+    # Bevestigingspopup
     if st.session_state.get('confirm_delete', False):
         with st.container():
             st.warning("⚠️ **Weet u zeker dat u de geselecteerde signalen wilt verwijderen?**")
             col_ja, col_nee = st.columns(2)
             with col_ja:
                 if st.button("✅ Ja, verwijderen", key="ja"):
-                    # Voeg toe aan de set van verwijderde signalen
+                    # Update persistente set
                     st.session_state.deleted_set.update(selected_labels)
-                    # Verwijder ze direct uit de DataFrame
+                    save_deleted_set(st.session_state.deleted_set)
+                    # Verwijder uit huidige df
                     mask = df.apply(
                         lambda row: f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" not in selected_labels,
                         axis=1
