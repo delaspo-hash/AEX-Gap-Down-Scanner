@@ -9,16 +9,5 @@
     "Gap %": 16.96,
     "Candle %": 19.63,
     "Signaaltype": "Dubbele Gap Down"
-  },
-  {
-    "Ticker": "CAT",
-    "Datum": "2026-08-06",
-    "Exchange": "NYSE/NASDAQ",
-    "Dag N Low": 870.0,
-    "N+1 Open": 862.0,
-    "N+1 Close": 856.96,
-    "Gap %": 0.92,
-    "Candle %": -0.58,
-    "Signaaltype": "Bearish Gap"
   }
 ]
