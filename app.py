@@ -3,9 +3,15 @@ import pandas as pd
 from gap_checker import scan_all_patterns, get_market_status
 from datetime import datetime
 import json
-import os
+import requests
+import base64
 
-PERSISTENT_FILE = "verwijderd.json"
+# --- Configuratie ---
+REPO = "delaspo-hash/AEX-Gap-Down-Scanner"
+FILE_PATH = "verwijderd.json"
+GITHUB_API = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+TOKEN = st.secrets["GITHUB_TOKEN"]
+HEADERS = {"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
 st.set_page_config(page_title="AEX+US Bearish Gap Scanner", page_icon="🐻", layout="wide")
 
@@ -45,24 +51,45 @@ st.markdown('<h1 style="color:#FF4B4B;">🐻 Bearish Gap Scanner</h1>', unsafe_a
 
 status = get_market_status()
 
-# --- Laad de persistente verwijderlijst ---
 def load_deleted_set():
-    if os.path.exists(PERSISTENT_FILE):
-        try:
-            with open(PERSISTENT_FILE, 'r') as f:
-                data = json.load(f)
-                return set(data)
-        except:
+    """Lees de lijst met verwijderde signalen uit GitHub."""
+    try:
+        resp = requests.get(GITHUB_API, headers=HEADERS)
+        if resp.status_code == 200:
+            content = resp.json()["content"]
+            decoded = base64.b64decode(content).decode("utf-8")
+            return set(json.loads(decoded))
+        else:
+            # Bestand bestaat misschien niet, beginnen met lege set
             return set()
-    return set()
+    except:
+        return set()
 
 def save_deleted_set(deleted_set):
-    with open(PERSISTENT_FILE, 'w') as f:
-        json.dump(list(deleted_set), f)
+    """Sla de lijst met verwijderde signalen op in GitHub."""
+    # Haal eerst de huidige sha op (nodig voor update)
+    sha = None
+    try:
+        resp = requests.get(GITHUB_API, headers=HEADERS)
+        if resp.status_code == 200:
+            sha = resp.json()["sha"]
+    except:
+        pass
+    payload = {
+        "message": "Update deleted signals",
+        "content": base64.b64encode(json.dumps(list(deleted_set)).encode("utf-8")).decode("utf-8")
+    }
+    if sha:
+        payload["sha"] = sha
+    try:
+        requests.put(GITHUB_API, headers=HEADERS, json=payload)
+    except:
+        st.error("Kon verwijderlijst niet opslaan op GitHub. Controleer of je token geldig is en de repo toegankelijk is.")
 
-# Initialiseer de set eenmalig per sessie
+# --- Initialiseer deleted_set ---
 if 'deleted_set' not in st.session_state:
-    st.session_state.deleted_set = load_deleted_set()
+    with st.spinner("Laden van verwijderde signalen..."):
+        st.session_state.deleted_set = load_deleted_set()
 
 # --- Data ophalen en filteren ---
 if 'df' not in st.session_state or st.button("🔄 Ververs data", type="primary"):
@@ -87,11 +114,10 @@ col3.metric("Signalen", f"{len(df)} vandaag")
 
 st.divider()
 
-# --- Knop om de verwijderlijst te wissen ---
+# Knop om de verwijderlijst te wissen
 if st.button("🗑️ Verwijderlijst legen (alle signalen terugzetten)"):
     st.session_state.deleted_set = set()
     save_deleted_set(set())
-    # Herlaad de data zonder filter
     full_df = scan_all_patterns()
     st.session_state.df = full_df
     st.success("Verwijderlijst gewist. Alle signalen zijn terug.")
@@ -100,7 +126,6 @@ if st.button("🗑️ Verwijderlijst legen (alle signalen terugzetten)"):
 if not df.empty:
     st.subheader("📋 Signalen")
 
-    # Multiselect (alleen huidige signalen)
     labels = [f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" for _, row in df.iterrows()]
     selected_labels = st.multiselect(
         "Selecteer signalen om te verwijderen:",
@@ -112,17 +137,14 @@ if not df.empty:
         st.session_state.confirm_delete = True
         st.rerun()
 
-    # Bevestigingspopup
     if st.session_state.get('confirm_delete', False):
         with st.container():
             st.warning("⚠️ **Weet u zeker dat u de geselecteerde signalen wilt verwijderen?**")
             col_ja, col_nee = st.columns(2)
             with col_ja:
                 if st.button("✅ Ja, verwijderen", key="ja"):
-                    # Update persistente set
                     st.session_state.deleted_set.update(selected_labels)
                     save_deleted_set(st.session_state.deleted_set)
-                    # Verwijder uit huidige df
                     mask = df.apply(
                         lambda row: f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" not in selected_labels,
                         axis=1
@@ -135,7 +157,7 @@ if not df.empty:
                     st.session_state.confirm_delete = False
                     st.rerun()
 
-    # --- Tabel weergeven (HTML) ---
+    # HTML tabel
     html = '<table class="gap-table"><thead><tr>'
     for col in df.columns:
         html += f'<th>{col}</th>'
