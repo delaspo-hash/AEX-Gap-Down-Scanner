@@ -28,6 +28,7 @@ st.markdown('<h1 style="color:#FF4B4B;">🐻 Bearish Gap Scanner</h1>', unsafe_a
 
 status = get_market_status()
 
+# --- Functies voor verwijderlijst ---
 def load_deleted_set():
     try:
         resp = requests.get(GITHUB_API, headers=HEADERS)
@@ -35,10 +36,9 @@ def load_deleted_set():
             content = resp.json()["content"]
             decoded = base64.b64decode(content).decode("utf-8")
             return set(json.loads(decoded))
-        else:
-            return set()
     except:
-        return set()
+        pass
+    return set()
 
 def save_deleted_set(deleted_set):
     sha = None
@@ -59,14 +59,24 @@ def save_deleted_set(deleted_set):
     except:
         st.error("Opslaan mislukt. Controleer je token.")
 
+# --- Initialiseer sessiestate ---
 if 'deleted_set' not in st.session_state:
-    with st.spinner("Laden van verwijderde signalen..."):
-        st.session_state.deleted_set = load_deleted_set()
+    st.session_state.deleted_set = load_deleted_set()
+if 'df' not in st.session_state:
+    st.session_state.df = scan_all_patterns()
+if 'confirm_delete' not in st.session_state:
+    st.session_state.confirm_delete = False
+if 'multiselect_key' not in st.session_state:
+    st.session_state.multiselect_key = 0
 
-if 'df' not in st.session_state or st.button("🔄 Ververs data", type="primary"):
+# --- Data ophalen en filteren ---
+if st.button("🔄 Ververs data", type="primary"):
     full_df = scan_all_patterns()
     if not full_df.empty:
-        mask = full_df.apply(lambda row: f"{row['Ticker']}|{row['Datum']}|{row['Signaaltype']}" not in st.session_state.deleted_set, axis=1)
+        mask = full_df.apply(
+            lambda row: f"{row['Ticker']}|{row['Datum']}|{row['Signaaltype']}" not in st.session_state.deleted_set,
+            axis=1
+        )
         st.session_state.df = full_df[mask].reset_index(drop=True)
     else:
         st.session_state.df = full_df
@@ -82,6 +92,7 @@ col3.metric("Signalen", f"{len(df)} vandaag")
 
 st.divider()
 
+# --- Verwijderlijst legen ---
 if st.button("🗑️ Verwijderlijst legen (alle signalen terugzetten)"):
     st.session_state.deleted_set = set()
     save_deleted_set(set())
@@ -90,30 +101,58 @@ if st.button("🗑️ Verwijderlijst legen (alle signalen terugzetten)"):
     st.success("Verwijderlijst gewist.")
     st.rerun()
 
+# --- Signalen weergeven ---
 if not df.empty:
     st.subheader("📋 Signalen")
+
+    # Maak labels voor de huidige df
     labels = [f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" for _, row in df.iterrows()]
-    selected_labels = st.multiselect("Selecteer signalen om te verwijderen:", options=labels, key="selected")
-    if st.button("🗑️ Verwijder geselecteerde signalen", disabled=len(selected_labels) == 0):
+
+    # Multiselect met dynamische key (reset na verwijdering)
+    selected = st.multiselect(
+        "Selecteer signalen om te verwijderen:",
+        options=labels,
+        key=f"select_{st.session_state.multiselect_key}"
+    )
+
+    # Verwijderknop – alleen actief als er iets geselecteerd is
+    if st.button("🗑️ Verwijder geselecteerde signalen", disabled=len(selected) == 0):
         st.session_state.confirm_delete = True
+        st.session_state.selected_to_delete = selected
         st.rerun()
-    if st.session_state.get('confirm_delete'):
+
+    # --- Bevestigingspopup ---
+    if st.session_state.confirm_delete and 'selected_to_delete' in st.session_state:
         with st.container():
-            st.warning("⚠️ Weet u het zeker?")
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("✅ Ja, verwijderen"):
-                    st.session_state.deleted_set.update(selected_labels)
+            st.warning("⚠️ **Weet u zeker dat u de geselecteerde signalen wilt verwijderen?**")
+            col_ja, col_nee = st.columns(2)
+            with col_ja:
+                if st.button("✅ Ja, verwijderen", key="ja_confirm"):
+                    # Verwerk verwijdering
+                    st.session_state.deleted_set.update(st.session_state.selected_to_delete)
                     save_deleted_set(st.session_state.deleted_set)
-                    mask = df.apply(lambda row: f"{row['Ticker']}|{row['Datum']}|{row['Signaaltype']}" not in selected_labels, axis=1)
+
+                    # Update df (verwijder de rijen)
+                    mask = df.apply(
+                        lambda row: f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" not in st.session_state.selected_to_delete,
+                        axis=1
+                    )
                     st.session_state.df = df[mask].reset_index(drop=True)
+
+                    # Reset popup en multiselect
                     st.session_state.confirm_delete = False
+                    del st.session_state.selected_to_delete
+                    st.session_state.multiselect_key += 1  # forceert nieuwe multiselect
+
                     st.rerun()
-            with c2:
-                if st.button("❌ Annuleren"):
+            with col_nee:
+                if st.button("❌ Annuleren", key="nee_confirm"):
                     st.session_state.confirm_delete = False
+                    if 'selected_to_delete' in st.session_state:
+                        del st.session_state.selected_to_delete
                     st.rerun()
 
+    # --- HTML-tabel ---
     html = '<table class="gap-table"><thead><tr>'
     for col in df.columns:
         html += f'<th>{col}</th>'
@@ -131,17 +170,23 @@ if not df.empty:
             html += f'<td>{val}</td>'
         html += '</tr>'
     html += '</tbody></table>'
+
     st.markdown(html, unsafe_allow_html=True)
-    st.caption("💡 Dubbele Gap Down = vet + lichtrode achtergrond.")
+    st.caption("💡 **Dubbele Gap Down**-signalen zijn **vet** met een lichtrode achtergrond.")
+
+    # Download CSV
     csv = df.to_csv(index=False)
-    st.download_button("📥 Download CSV", csv, file_name=f"bearish_signals_{datetime.now().strftime('%Y%m%d')}.csv")
+    st.download_button("📥 Download als CSV", data=csv,
+                       file_name=f"bearish_signals_{datetime.now().strftime('%Y%m%d')}.csv",
+                       mime="text/csv")
+
 else:
     st.success("✅ Geen signalen vandaag.")
     st.markdown("""
-    ### 📖 Uitleg
-    - **Bearish Gap**: N+1 open < low N, close < open N+1.
-    - **Dubbele Gap Down**: N+1 high < low N, N+2 open < low N.
+    ### 📖 Uitleg signalen
+    - **Bearish Gap**: N+1 open < low van N, én N+1 close < open N+1.
+    - **Dubbele Gap Down**: N+1 high < low van N, én N+2 open < low van N.
     """)
 
 st.divider()
-st.caption("📊 Yahoo Finance (15 min vertraagd) • AEX + 100 US-bedrijven")
+st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX + 100 US-bedrijven")
