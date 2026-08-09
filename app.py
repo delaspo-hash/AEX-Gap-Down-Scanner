@@ -7,7 +7,14 @@ import requests
 import base64
 from io import BytesIO
 
-# --- GitHub configuratie voor permanente opslag ---
+# --- Controleer of openpyxl beschikbaar is ---
+try:
+    import openpyxl
+    EXCEL_OK = True
+except ImportError:
+    EXCEL_OK = False
+
+# --- GitHub configuratie ---
 REPO = "delaspo-hash/AEX-Gap-Down-Scanner"
 SAVED_FILE = "saved_signals.json"
 GITHUB_API = f"https://api.github.com/repos/{REPO}/contents/{SAVED_FILE}"
@@ -16,7 +23,6 @@ HEADERS = {"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.
 
 st.set_page_config(page_title="AEX+US Gap Scanner", page_icon="🐻", layout="wide")
 
-# Lichte tabelstijl (bearish = rood, bullish = groen)
 st.markdown("""
 <style>
     .gap-table { background-color: white; color: black; border-collapse: collapse; width: 100%; font-size: 14px; }
@@ -31,26 +37,23 @@ st.markdown('<h1 style="color:#FF4B4B;">🐻🐂 Bearish & Bullish Gap Scanner</
 
 status = get_market_status()
 
-# --- Excel hulpfunctie ---
 def to_excel(df):
-    """Converteer een DataFrame naar een Excel-bestand in geheugen."""
+    """DataFrame naar Excel-bytes"""
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Signalen')
     return output.getvalue()
 
-# --- GitHub hulpfuncties ---
 def load_saved_signals():
     try:
         resp = requests.get(GITHUB_API, headers=HEADERS)
         if resp.status_code == 200:
             content = resp.json()["content"]
-            decoded = base64.b64decode(content).decode("utf-8")
-            return json.loads(decoded)
+            return json.loads(base64.b64decode(content).decode("utf-8"))
         elif resp.status_code == 404:
             return []
         else:
-            st.error(f"Fout bij laden opgeslagen signalen: {resp.status_code}")
+            st.error(f"Fout bij laden: {resp.status_code}")
             return []
     except Exception as e:
         st.error(f"Verbindingsfout: {e}")
@@ -72,18 +75,14 @@ def save_saved_signals(signals_list):
         payload["sha"] = sha
     try:
         resp = requests.put(GITHUB_API, headers=HEADERS, json=payload)
-        if resp.status_code in [200, 201]:
-            return True
-        else:
-            st.error(f"Opslaan mislukt: {resp.status_code} – {resp.text}")
-            return False
+        return resp.status_code in [200, 201]
     except Exception as e:
-        st.error(f"Verbindingsfout bij opslaan: {e}")
+        st.error(f"Opslaan mislukt: {e}")
         return False
 
-# --- Initialiseer sessie ---
+# --- Sessiestate ---
 if 'saved_signals' not in st.session_state:
-    with st.spinner("Laden van opgeslagen signalen..."):
+    with st.spinner("Laden opgeslagen signalen..."):
         st.session_state.saved_signals = load_saved_signals()
 
 if 'daily_df' not in st.session_state or st.button("🔄 Ververs data", type="primary"):
@@ -92,7 +91,6 @@ if 'daily_df' not in st.session_state or st.button("🔄 Ververs data", type="pr
 
 daily_df = st.session_state.daily_df
 
-# --- Header ---
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("AEX", status["AEX"])
 col2.metric("US Beurzen", status["US"])
@@ -109,34 +107,26 @@ if not daily_df.empty:
     selected = st.multiselect("Selecteer signalen om op te slaan:", options=labels, key="save_select")
 
     if st.button("💾 Sla geselecteerde signalen op", disabled=len(selected) == 0):
-        mask = daily_df.apply(
-            lambda row: f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" in selected,
-            axis=1
-        )
+        mask = daily_df.apply(lambda r: f"{r['Ticker']} | {r['Datum']} | {r['Signaaltype']}" in selected, axis=1)
         to_save = daily_df[mask].to_dict(orient='records')
-        current_saved = st.session_state.saved_signals
-        new_entries = []
-        for entry in to_save:
-            if not any(e['Ticker'] == entry['Ticker'] and e['Datum'] == entry['Datum'] and e['Signaaltype'] == entry['Signaaltype'] for e in current_saved):
-                new_entries.append(entry)
-        if new_entries:
-            current_saved.extend(new_entries)
-            if save_saved_signals(current_saved):
-                st.session_state.saved_signals = current_saved
-                st.success(f"{len(new_entries)} signa(a)l(en) opgeslagen!")
+        current = st.session_state.saved_signals
+        new = [e for e in to_save if not any(x['Ticker']==e['Ticker'] and x['Datum']==e['Datum'] and x['Signaaltype']==e['Signaaltype'] for x in current)]
+        if new:
+            current.extend(new)
+            if save_saved_signals(current):
+                st.session_state.saved_signals = current
+                st.success(f"{len(new)} opgeslagen!")
                 st.rerun()
-            else:
-                st.error("Opslaan mislukt.")
         else:
-            st.info("Deze signalen zijn al opgeslagen.")
+            st.info("Al opgeslagen.")
 
-    # HTML‑tabel met dagelijkse signalen
+    # HTML tabel
     html = '<table class="gap-table"><thead><tr>'
     for col in daily_df.columns:
         html += f'<th>{col}</th>'
     html += '</tr></thead><tbody>'
     for _, row in daily_df.iterrows():
-        cls = 'bearish-gap' if row['Signaaltype'] == 'Bearish Gap' else 'bullish-gap'
+        cls = 'bearish-gap' if row['Signaaltype']=='Bearish Gap' else 'bullish-gap'
         html += f'<tr class="{cls}">'
         for col in daily_df.columns:
             val = row[col]
@@ -150,18 +140,17 @@ if not daily_df.empty:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # Downloadknoppen voor dagelijkse signalen
-    col_csv, col_excel = st.columns(2)
-    with col_csv:
-        csv_daily = daily_df.to_csv(index=False)
-        st.download_button("📥 CSV", data=csv_daily,
-                           file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.csv",
-                           mime="text/csv")
-    with col_excel:
-        excel_data = to_excel(daily_df)
-        st.download_button("📥 Excel", data=excel_data,
+    # Downloadknoppen – onder elkaar voor zekerheid
+    st.markdown("**Download dagelijkse signalen:**")
+    st.download_button("📥 Download als CSV", daily_df.to_csv(index=False),
+                       file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.csv",
+                       mime="text/csv")
+    if EXCEL_OK:
+        st.download_button("📥 Download als Excel", to_excel(daily_df),
                            file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        st.warning("Excel‑export niet beschikbaar (openpyxl ontbreekt). Vraag de beheerder om openpyxl toe te voegen aan requirements.txt.")
 
 else:
     st.success("✅ Geen signalen vandaag.")
@@ -179,7 +168,7 @@ if st.session_state.saved_signals:
         html += f'<th>{col}</th>'
     html += '</tr></thead><tbody>'
     for _, row in saved_df.iterrows():
-        cls = 'bearish-gap' if row['Signaaltype'] == 'Bearish Gap' else 'bullish-gap'
+        cls = 'bearish-gap' if row['Signaaltype']=='Bearish Gap' else 'bullish-gap'
         html += f'<tr class="{cls}">'
         for col in saved_df.columns:
             val = row[col]
@@ -193,34 +182,29 @@ if st.session_state.saved_signals:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # Downloadknoppen voor opgeslagen signalen
-    col_csv2, col_excel2 = st.columns(2)
-    with col_csv2:
-        csv_saved = saved_df.to_csv(index=False)
-        st.download_button("📥 CSV", data=csv_saved,
-                           file_name=f"saved_signals_{datetime.now().strftime('%Y%m%d')}.csv",
-                           mime="text/csv")
-    with col_excel2:
-        excel_saved = to_excel(saved_df)
-        st.download_button("📥 Excel", data=excel_saved,
+    st.markdown("**Download opgeslagen signalen:**")
+    st.download_button("📥 Download als CSV", saved_df.to_csv(index=False),
+                       file_name=f"saved_signals_{datetime.now().strftime('%Y%m%d')}.csv",
+                       mime="text/csv")
+    if EXCEL_OK:
+        st.download_button("📥 Download als Excel", to_excel(saved_df),
                            file_name=f"saved_signals_{datetime.now().strftime('%Y%m%d')}.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # Verwijderen uit opgeslagen lijst
     st.markdown("---")
     st.subheader("🗑️ Verwijder uit opgeslagen lijst")
     saved_labels = [f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" for _, row in saved_df.iterrows()]
     to_delete = st.multiselect("Selecteer signalen om te verwijderen:", options=saved_labels, key="delete_select")
-    if st.button("🗑️ Verwijder geselecteerde uit opgeslagen lijst", disabled=len(to_delete) == 0):
-        new_list = [entry for entry in st.session_state.saved_signals if f"{entry['Ticker']} | {entry['Datum']} | {entry['Signaaltype']}" not in to_delete]
+    if st.button("🗑️ Verwijder geselecteerde", disabled=len(to_delete)==0):
+        new_list = [e for e in st.session_state.saved_signals if f"{e['Ticker']} | {e['Datum']} | {e['Signaaltype']}" not in to_delete]
         if save_saved_signals(new_list):
             st.session_state.saved_signals = new_list
-            st.success(f"{len(to_delete)} signa(a)l(en) verwijderd.")
+            st.success(f"{len(to_delete)} verwijderd.")
             st.rerun()
         else:
             st.error("Verwijderen mislukt.")
 else:
-    st.info("Nog geen signalen opgeslagen. Selecteer hierboven signalen en klik op 'Sla geselecteerde signalen op'.")
+    st.info("Nog geen opgeslagen signalen.")
 
 st.divider()
-st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX + 100 US-bedrijven • Opgeslagen signalen in GitHub")
+st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX + 100 US-bedrijven")
