@@ -141,6 +141,12 @@ if not daily_df.empty:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
+    # Downloadknop voor dagelijkse signalen
+    csv_daily = daily_df.to_csv(index=False)
+    st.download_button("📥 Download dagelijkse signalen als CSV", data=csv_daily,
+                       file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.csv",
+                       mime="text/csv")
+
 else:
     st.success("✅ Geen signalen vandaag.")
 
