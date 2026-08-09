@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 import requests
 import base64
+from io import BytesIO
 
 # --- GitHub configuratie voor permanente opslag ---
 REPO = "delaspo-hash/AEX-Gap-Down-Scanner"
@@ -29,6 +30,14 @@ st.markdown("""
 st.markdown('<h1 style="color:#FF4B4B;">🐻🐂 Bearish & Bullish Gap Scanner</h1>', unsafe_allow_html=True)
 
 status = get_market_status()
+
+# --- Excel hulpfunctie ---
+def to_excel(df):
+    """Converteer een DataFrame naar een Excel-bestand in geheugen."""
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Signalen')
+    return output.getvalue()
 
 # --- GitHub hulpfuncties ---
 def load_saved_signals():
@@ -141,11 +150,18 @@ if not daily_df.empty:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # Downloadknop voor dagelijkse signalen
-    csv_daily = daily_df.to_csv(index=False)
-    st.download_button("📥 Download dagelijkse signalen als CSV", data=csv_daily,
-                       file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.csv",
-                       mime="text/csv")
+    # Downloadknoppen voor dagelijkse signalen
+    col_csv, col_excel = st.columns(2)
+    with col_csv:
+        csv_daily = daily_df.to_csv(index=False)
+        st.download_button("📥 CSV", data=csv_daily,
+                           file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.csv",
+                           mime="text/csv")
+    with col_excel:
+        excel_data = to_excel(daily_df)
+        st.download_button("📥 Excel", data=excel_data,
+                           file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 else:
     st.success("✅ Geen signalen vandaag.")
@@ -177,10 +193,18 @@ if st.session_state.saved_signals:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    csv = saved_df.to_csv(index=False)
-    st.download_button("📥 Download opgeslagen signalen als CSV", data=csv,
-                       file_name=f"saved_signals_{datetime.now().strftime('%Y%m%d')}.csv",
-                       mime="text/csv")
+    # Downloadknoppen voor opgeslagen signalen
+    col_csv2, col_excel2 = st.columns(2)
+    with col_csv2:
+        csv_saved = saved_df.to_csv(index=False)
+        st.download_button("📥 CSV", data=csv_saved,
+                           file_name=f"saved_signals_{datetime.now().strftime('%Y%m%d')}.csv",
+                           mime="text/csv")
+    with col_excel2:
+        excel_saved = to_excel(saved_df)
+        st.download_button("📥 Excel", data=excel_saved,
+                           file_name=f"saved_signals_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     # Verwijderen uit opgeslagen lijst
     st.markdown("---")
