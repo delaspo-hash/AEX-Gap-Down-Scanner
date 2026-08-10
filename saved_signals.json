@@ -1,14 +1,1 @@
-[
-  {
-    "Ticker": "RTX",
-    "Datum": "2026-08-10",
-    "Exchange": "NYSE/NASDAQ",
-    "Dag N High": 224.31,
-    "Dag N Low": 220.5,
-    "N+1 Open": 224.38,
-    "N+1 Close": 225.88,
-    "Gap %": 0.03,
-    "Candle %": 0.67,
-    "Signaaltype": "Bullish Gap"
-  }
-]
+[]
