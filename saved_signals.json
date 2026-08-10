@@ -1,1 +1,74 @@
-[]
+[
+  {
+    "Ticker": "PLD",
+    "Datum": "2026-08-10",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N High": 140.42,
+    "Dag N Low": 138.25,
+    "N+1 Open": 138.11,
+    "N+1 Close": 137.65,
+    "Gap %": 0.1,
+    "Candle %": -0.34,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "ORCL",
+    "Datum": "2026-08-10",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N High": 147.16,
+    "Dag N Low": 142.34,
+    "N+1 Open": 148.26,
+    "N+1 Close": 148.97,
+    "Gap %": 0.75,
+    "Candle %": 0.48,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "CSCO",
+    "Datum": "2026-08-10",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N High": 122.59,
+    "Dag N Low": 119.45,
+    "N+1 Open": 123.4,
+    "N+1 Close": 124.24,
+    "Gap %": 0.66,
+    "Candle %": 0.68,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "BRK-B",
+    "Datum": "2026-08-10",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N High": 521.99,
+    "Dag N Low": 517.43,
+    "N+1 Open": 524.6,
+    "N+1 Close": 535.27,
+    "Gap %": 0.5,
+    "Candle %": 2.03,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "META",
+    "Datum": "2026-08-10",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N High": 598.74,
+    "Dag N Low": 585.62,
+    "N+1 Open": 599.01,
+    "N+1 Close": 602.38,
+    "Gap %": 0.05,
+    "Candle %": 0.56,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "RTX",
+    "Datum": "2026-08-10",
+    "Exchange": "NYSE/NASDAQ",
+    "Dag N High": 224.31,
+    "Dag N Low": 220.5,
+    "N+1 Open": 224.38,
+    "N+1 Close": 225.88,
+    "Gap %": 0.03,
+    "Candle %": 0.67,
+    "Signaaltype": "Bullish Gap"
+  }
+]
