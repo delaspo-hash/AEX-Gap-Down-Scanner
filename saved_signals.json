@@ -1,29 +1,5 @@
 [
   {
-    "Ticker": "PLD",
-    "Datum": "2026-08-10",
-    "Exchange": "NYSE/NASDAQ",
-    "Dag N High": 140.42,
-    "Dag N Low": 138.25,
-    "N+1 Open": 138.11,
-    "N+1 Close": 137.65,
-    "Gap %": 0.1,
-    "Candle %": -0.34,
-    "Signaaltype": "Bearish Gap"
-  },
-  {
-    "Ticker": "ORCL",
-    "Datum": "2026-08-10",
-    "Exchange": "NYSE/NASDAQ",
-    "Dag N High": 147.16,
-    "Dag N Low": 142.34,
-    "N+1 Open": 148.26,
-    "N+1 Close": 148.97,
-    "Gap %": 0.75,
-    "Candle %": 0.48,
-    "Signaaltype": "Bullish Gap"
-  },
-  {
     "Ticker": "CSCO",
     "Datum": "2026-08-10",
     "Exchange": "NYSE/NASDAQ",
