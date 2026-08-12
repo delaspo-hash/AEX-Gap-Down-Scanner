@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "Ticker": "PRX",
+    "Datum": "2026-08-12",
+    "Exchange": "AEX",
+    "Dag N High": 42.44,
+    "Dag N Low": 41.92,
+    "N+1 Open": 40.87,
+    "N+1 Close": 39.97,
+    "Gap %": 2.52,
+    "Candle %": -2.19,
+    "Signaaltype": "Bearish Gap"
+  }
+]
