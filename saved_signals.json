@@ -10,5 +10,41 @@
     "Gap %": 2.52,
     "Candle %": -2.19,
     "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "DSFIR",
+    "Datum": "2026-08-12",
+    "Exchange": "AEX",
+    "Dag N High": 94.58,
+    "Dag N Low": 93.66,
+    "N+1 Open": 92.2,
+    "N+1 Close": 91.6,
+    "Gap %": 1.56,
+    "Candle %": -0.65,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "HEIA",
+    "Datum": "2026-08-12",
+    "Exchange": "AEX",
+    "Dag N High": 77.08,
+    "Dag N Low": 75.78,
+    "N+1 Open": 75.02,
+    "N+1 Close": 74.66,
+    "Gap %": 1.0,
+    "Candle %": -0.48,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "ADYEN",
+    "Datum": "2026-08-12",
+    "Exchange": "AEX",
+    "Dag N High": 946.5,
+    "Dag N Low": 922.9,
+    "N+1 Open": 919.0,
+    "N+1 Close": 911.4,
+    "Gap %": 0.42,
+    "Candle %": -0.83,
+    "Signaaltype": "Bearish Gap"
   }
 ]
