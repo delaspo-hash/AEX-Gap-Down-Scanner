@@ -46,5 +46,29 @@
     "Gap %": 0.42,
     "Candle %": -0.83,
     "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "IMCD",
+    "Datum": "2026-08-12",
+    "Exchange": "AEX",
+    "Dag N High": 101.1,
+    "Dag N Low": 97.9,
+    "N+1 Open": 97.68,
+    "N+1 Close": 97.26,
+    "Gap %": 0.22,
+    "Candle %": -0.43,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "VPK",
+    "Datum": "2026-08-12",
+    "Exchange": "AEX",
+    "Dag N High": 46.84,
+    "Dag N Low": 46.13,
+    "N+1 Open": 47.28,
+    "N+1 Close": 47.44,
+    "Gap %": 0.94,
+    "Candle %": 0.34,
+    "Signaaltype": "Bullish Gap"
   }
 ]
