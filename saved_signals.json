@@ -286,5 +286,41 @@
     "Gap %": 0.09,
     "Candle %": 2.41,
     "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "ADYEN",
+    "Datum": "2026-08-13",
+    "Exchange": "AEX",
+    "Dag N High": 921.6,
+    "Dag N Low": 898.2,
+    "N+1 Open": 962.0,
+    "N+1 Close": 1046.8,
+    "Gap %": 4.38,
+    "Candle %": 8.81,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "KPN",
+    "Datum": "2026-08-13",
+    "Exchange": "AEX",
+    "Dag N High": 4.01,
+    "Dag N Low": 3.98,
+    "N+1 Open": 4.02,
+    "N+1 Close": 4.05,
+    "Gap %": 0.15,
+    "Candle %": 0.8,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "INGA",
+    "Datum": "2026-08-13",
+    "Exchange": "AEX",
+    "Dag N High": 30.94,
+    "Dag N Low": 30.76,
+    "N+1 Open": 30.98,
+    "N+1 Close": 31.21,
+    "Gap %": 0.11,
+    "Candle %": 0.76,
+    "Signaaltype": "Bullish Gap"
   }
 ]
