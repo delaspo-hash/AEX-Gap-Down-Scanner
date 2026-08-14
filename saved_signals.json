@@ -10,5 +10,17 @@
     "Gap %": 0.72,
     "Candle %": -1.54,
     "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "PHIA",
+    "Datum": "2026-08-14",
+    "Exchange": "AEX",
+    "Dag N High": 23.6,
+    "Dag N Low": 23.01,
+    "N+1 Open": 23.86,
+    "N+1 Close": 24.13,
+    "Gap %": 1.1,
+    "Candle %": 1.13,
+    "Signaaltype": "Bullish Gap"
   }
 ]
