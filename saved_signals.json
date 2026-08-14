@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "Ticker": "MT",
+    "Datum": "2026-08-14",
+    "Exchange": "AEX",
+    "Dag N High": 65.16,
+    "Dag N Low": 64.02,
+    "N+1 Open": 63.56,
+    "N+1 Close": 62.58,
+    "Gap %": 0.72,
+    "Candle %": -1.54,
+    "Signaaltype": "Bearish Gap"
+  }
+]
