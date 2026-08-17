@@ -77,6 +77,19 @@ def save_saved_signals(signals_list):
         st.error(f"Opslaan mislukt: {e}")
         return False
 
+def safe_sort(df, preferred_order, preferred_ascending):
+    """
+    Sorteert de DataFrame op de kolommen die bestaan, in de gewenste volgorde.
+    Ontbrekende kolommen worden genegeerd.
+    """
+    available_cols = [c for c in preferred_order if c in df.columns]
+    if not available_cols:
+        return df
+    # Pas ascending aan: de bijbehorende waarden ophalen
+    ascending_vals = [preferred_ascending[preferred_order.index(c)] for c in available_cols]
+    return df.sort_values(available_cols, ascending=ascending_vals)
+
+# --- Initialiseer sessie ---
 if 'saved_signals' not in st.session_state:
     with st.spinner("Laden opgeslagen signalen..."):
         st.session_state.saved_signals = load_saved_signals()
@@ -87,12 +100,12 @@ if 'daily_df' not in st.session_state or st.button("🔄 Ververs data", type="pr
 
 daily_df = st.session_state.daily_df
 
-# Sorteer dagelijkse dataframe nogmaals (extra zekerheid)
+# --- Definieer sortering voor dagelijkse df (altijd compleet) ---
+sort_cols = ['Datum', 'Tijdstip', 'Exchange', 'Ticker']
+sort_ascending = [False, False, True, True]
+
 if not daily_df.empty:
-    daily_df = daily_df.sort_values(
-        ['Datum', 'Tijdstip', 'Exchange', 'Ticker'],
-        ascending=[False, False, True, True]
-    )
+    daily_df = safe_sort(daily_df, sort_cols, sort_ascending)
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Euronext", status)
@@ -164,12 +177,10 @@ st.subheader("📁 Opgeslagen signalen (permanent)")
 
 if st.session_state.saved_signals:
     saved_df = pd.DataFrame(st.session_state.saved_signals)
-    # Sorteer opgeslagen signalen ook op de gewenste volgorde
+
+    # Veilige sortering ook voor opgeslagen signalen (Tijdstip kan ontbreken)
     if not saved_df.empty:
-        saved_df = saved_df.sort_values(
-            ['Datum', 'Tijdstip', 'Exchange', 'Ticker'],
-            ascending=[False, False, True, True]
-        )
+        saved_df = safe_sort(saved_df, sort_cols, sort_ascending)
 
     html = '<table class="gap-table"><thead><tr>'
     for col in saved_df.columns:
