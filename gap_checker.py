@@ -14,32 +14,14 @@ AEX_TICKERS = [
 
 # === EURONEXT BRUSSEL (BEL20 + enkele extra) ===
 BEL20_TICKERS = [
-    "ABI.BR",      # Anheuser-Busch InBev
-    "AGS.BR",      # Ageas
-    "ARGX.BR",     # argenx
-    "BAR.BR",      # Barco
-    "COFB.BR",     # Cofinimmo
-    "COLR.BR",     # Colruyt
-    "DEME.BR",     # DEME
-    "ELI.BR",      # Elia
-    "GBLB.BR",     # Groupe Bruxelles Lambert
-    "KBC.BR",      # KBC Groep
-    "MELE.BR",     # Melexis
-    "PROX.BR",     # Proximus
-    "SOF.BR",      # Sofina
-    "SOLB.BR",     # Solvay
-    "TNET.BR",     # Telenet
-    "UCB.BR",      # UCB
-    "UMI.BR",      # Umicore
-    "VGP.BR",      # VGP
-    "WDP.BR"       # Warehouses De Pauw
+    "ABI.BR", "AGS.BR", "ARGX.BR", "BAR.BR", "COFB.BR",
+    "COLR.BR", "DEME.BR", "ELI.BR", "GBLB.BR", "KBC.BR",
+    "MELE.BR", "PROX.BR", "SOF.BR", "SOLB.BR", "TNET.BR",
+    "UCB.BR", "UMI.BR", "VGP.BR", "WDP.BR"
 ]
 
 def fetch_ticker_data(tickers, period="5d"):
-    """
-    Downloadt dagelijkse koersdata voor een lijst tickers.
-    Eerst batch, daarna per ticker met pauzes indien nodig.
-    """
+    """Downloadt dagelijkse koersdata voor een lijst tickers."""
     if not tickers:
         return {}
     try:
@@ -51,7 +33,6 @@ def fetch_ticker_data(tickers, period="5d"):
     except:
         pass
 
-    # Fallback: één voor één
     result = {}
     for i, t in enumerate(tickers):
         try:
@@ -66,14 +47,15 @@ def fetch_ticker_data(tickers, period="5d"):
 
 def scan_all_patterns():
     """
-    Scant op twee patronen:
-    1. Bearish Gap: N+1 open < N low én N+1 close < N+1 open
-    2. Bullish Gap: N+1 open > N high én N+1 close > N+1 open
-    Retourneert DataFrame met kolom 'Signaaltype'.
+    Scant op Bearish en Bullish Gap, voegt een tijdstip toe en sorteert
+    op Datum (aflopend), Tijdstip (aflopend), Exchange (oplopend), Ticker (oplopend).
     """
     all_tickers = AEX_TICKERS + BEL20_TICKERS
     batch_size = 50
     results = []
+
+    # Eén tijdstip voor de hele scan
+    scan_time = datetime.now().strftime('%H:%M:%S')
 
     for i in range(0, len(all_tickers), batch_size):
         batch = all_tickers[i:i+batch_size]
@@ -90,7 +72,6 @@ def scan_all_patterns():
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
 
-                # Laatste twee voltooide dagen: N (eergisteren), N+1 (gisteren)
                 if len(df) < 2:
                     continue
                 dag_n = df.iloc[-2]
@@ -102,8 +83,7 @@ def scan_all_patterns():
                 close_n1 = float(dag_n1['Close'])
 
                 date_n1 = dag_n1.name.strftime('%Y-%m-%d') if hasattr(dag_n1.name, 'strftime') else str(dag_n1.name)[:10]
-                
-                # Beurs bepalen
+
                 if ticker.endswith('.AS'):
                     exchange = "Amsterdam"
                     ticker_clean = ticker.replace('.AS', '')
@@ -119,9 +99,10 @@ def scan_all_patterns():
                     gap_pct = ((low_n - open_n1) / low_n) * 100
                     candle_pct = ((close_n1 - open_n1) / open_n1) * 100
                     results.append({
-                        'Ticker': ticker_clean,
                         'Datum': date_n1,
+                        'Tijdstip': scan_time,
                         'Exchange': exchange,
+                        'Ticker': ticker_clean,
                         'Dag N High': round(high_n, 2),
                         'Dag N Low': round(low_n, 2),
                         'N+1 Open': round(open_n1, 2),
@@ -136,9 +117,10 @@ def scan_all_patterns():
                     gap_pct = ((open_n1 - high_n) / high_n) * 100
                     candle_pct = ((close_n1 - open_n1) / open_n1) * 100
                     results.append({
-                        'Ticker': ticker_clean,
                         'Datum': date_n1,
+                        'Tijdstip': scan_time,
                         'Exchange': exchange,
+                        'Ticker': ticker_clean,
                         'Dag N High': round(high_n, 2),
                         'Dag N Low': round(low_n, 2),
                         'N+1 Open': round(open_n1, 2),
@@ -153,7 +135,11 @@ def scan_all_patterns():
 
     df = pd.DataFrame(results)
     if not df.empty:
-        df = df.sort_values(['Signaaltype', 'Gap %'], ascending=[True, False])
+        # Sorteren: Datum aflopend, Tijdstip aflopend, Exchange oplopend, Ticker oplopend
+        df = df.sort_values(
+            ['Datum', 'Tijdstip', 'Exchange', 'Ticker'],
+            ascending=[False, False, True, True]
+        )
     return df
 
 def get_market_status():
@@ -166,7 +152,6 @@ def get_market_status():
     if weekday >= 5:
         return "🔴 Weekend - Euronext gesloten"
 
-    # Euronext Amsterdam & Brussel: 09:00 - 17:30
     if hour < 9:
         return "⏳ Euronext nog niet open"
     elif hour < 17 or (hour == 17 and minute < 30):
