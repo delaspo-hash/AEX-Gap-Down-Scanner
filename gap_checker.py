@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import time
 
-# === JUISTE AEX-TICKERS ===
+# === EURONEXT AMSTERDAM (AEX) ===
 AEX_TICKERS = [
     "ADYEN.AS", "AGN.AS", "AKZA.AS", "ASM.AS", "ASML.AS",
     "BESI.AS", "DSFIR.AS", "EXO.AS", "HEIA.AS", "IMCD.AS",
@@ -12,18 +12,27 @@ AEX_TICKERS = [
     "VPK.AS", "WKL.AS"
 ]
 
-# === 100 GROOTSTE US-BEDRIJVEN ===
-US_TICKERS = [
-    "AAPL", "MSFT", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "BRK-B", "JPM", "V",
-    "JNJ", "WMT", "PG", "MA", "UNH", "HD", "BAC", "DIS", "ADBE", "CRM",
-    "NFLX", "INTC", "CSCO", "VZ", "KO", "PEP", "MRK", "ABT", "WFC", "TMO",
-    "NVDA", "AVGO", "AMD", "QCOM", "TXN", "AMAT", "MU", "ADI", "LRCX", "KLAC",
-    "COST", "NKE", "DHR", "LLY", "MDT", "LIN", "UPS", "RTX", "HON", "UNP",
-    "LOW", "ORCL", "MS", "GS", "BLK", "C", "AXP", "AMGN", "SPGI", "NOW",
-    "INTU", "ISRG", "BKNG", "SCHW", "DE", "PLD", "AMT", "ADP", "CB", "MMC",
-    "T", "BMY", "GILD", "CI", "CVS", "MDLZ", "SBUX", "MO", "SO", "DUK",
-    "NEE", "CAT", "BA", "GE", "GM", "F", "UBER", "PYPL", "SQ", "ZM",
-    "SNAP", "PINS", "ROKU", "DKNG", "CRWD", "NET", "DDOG", "SNOW", "PLTR", "U"
+# === EURONEXT BRUSSEL (BEL20 + enkele extra) ===
+BEL20_TICKERS = [
+    "ABI.BR",      # Anheuser-Busch InBev
+    "AGS.BR",      # Ageas
+    "ARGX.BR",     # argenx
+    "BAR.BR",      # Barco
+    "COFB.BR",     # Cofinimmo
+    "COLR.BR",     # Colruyt
+    "DEME.BR",     # DEME
+    "ELI.BR",      # Elia
+    "GBLB.BR",     # Groupe Bruxelles Lambert
+    "KBC.BR",      # KBC Groep
+    "MELE.BR",     # Melexis
+    "PROX.BR",     # Proximus
+    "SOF.BR",      # Sofina
+    "SOLB.BR",     # Solvay
+    "TNET.BR",     # Telenet
+    "UCB.BR",      # UCB
+    "UMI.BR",      # Umicore
+    "VGP.BR",      # VGP
+    "WDP.BR"       # Warehouses De Pauw
 ]
 
 def fetch_ticker_data(tickers, period="5d"):
@@ -62,7 +71,7 @@ def scan_all_patterns():
     2. Bullish Gap: N+1 open > N high én N+1 close > N+1 open
     Retourneert DataFrame met kolom 'Signaaltype'.
     """
-    all_tickers = AEX_TICKERS + US_TICKERS
+    all_tickers = AEX_TICKERS + BEL20_TICKERS
     batch_size = 50
     results = []
 
@@ -81,7 +90,7 @@ def scan_all_patterns():
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
 
-                # We hebben de laatste twee voltooide dagen nodig: N (eergisteren), N+1 (gisteren)
+                # Laatste twee voltooide dagen: N (eergisteren), N+1 (gisteren)
                 if len(df) < 2:
                     continue
                 dag_n = df.iloc[-2]
@@ -93,8 +102,17 @@ def scan_all_patterns():
                 close_n1 = float(dag_n1['Close'])
 
                 date_n1 = dag_n1.name.strftime('%Y-%m-%d') if hasattr(dag_n1.name, 'strftime') else str(dag_n1.name)[:10]
-                exchange = "AEX" if ticker.endswith('.AS') else "NYSE/NASDAQ"
-                ticker_clean = ticker.replace('.AS', '')
+                
+                # Beurs bepalen
+                if ticker.endswith('.AS'):
+                    exchange = "Amsterdam"
+                    ticker_clean = ticker.replace('.AS', '')
+                elif ticker.endswith('.BR'):
+                    exchange = "Brussel"
+                    ticker_clean = ticker.replace('.BR', '')
+                else:
+                    exchange = "Onbekend"
+                    ticker_clean = ticker
 
                 # --- Bearish Gap ---
                 if open_n1 < low_n and close_n1 < open_n1:
@@ -135,34 +153,23 @@ def scan_all_patterns():
 
     df = pd.DataFrame(results)
     if not df.empty:
-        # Sorteer op signaaltype en dan op absolute gap (grootste eerst)
         df = df.sort_values(['Signaaltype', 'Gap %'], ascending=[True, False])
     return df
 
 def get_market_status():
-    """Bepaal of de AEX- en US-beurzen geopend zijn (Nederlandse tijd)."""
+    """Bepaal of Euronext (Amsterdam & Brussel) geopend is."""
     now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
     minute = now.minute
     weekday = now.weekday()
 
     if weekday >= 5:
-        return {"AEX": "🔴 Weekend", "US": "🔴 Weekend"}
+        return "🔴 Weekend - Euronext gesloten"
 
-    # AEX (9:00 - 17:30)
+    # Euronext Amsterdam & Brussel: 09:00 - 17:30
     if hour < 9:
-        aex = "⏳ AEX nog niet open"
+        return "⏳ Euronext nog niet open"
     elif hour < 17 or (hour == 17 and minute < 30):
-        aex = "🟢 AEX open"
+        return "🟢 Euronext open"
     else:
-        aex = "🔴 AEX gesloten"
-
-    # US (15:30 - 22:00)
-    if hour < 15 or (hour == 15 and minute < 30):
-        us = "⏳ US nog niet open"
-    elif hour < 22:
-        us = "🟢 US open"
-    else:
-        us = "🔴 US gesloten"
-
-    return {"AEX": aex, "US": us}
+        return "🔴 Euronext gesloten"

@@ -21,8 +21,9 @@ GITHUB_API = f"https://api.github.com/repos/{REPO}/contents/{SAVED_FILE}"
 TOKEN = st.secrets["GITHUB_TOKEN"]
 HEADERS = {"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
-st.set_page_config(page_title="AEX+US Gap Scanner", page_icon="🐻", layout="wide")
+st.set_page_config(page_title="Euronext Gap Scanner", page_icon="🐻", layout="wide")
 
+# Lichte tabelstijl
 st.markdown("""
 <style>
     .gap-table { background-color: white; color: black; border-collapse: collapse; width: 100%; font-size: 14px; }
@@ -33,12 +34,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<h1 style="color:#FF4B4B;">🐻🐂 Bearish & Bullish Gap Scanner</h1>', unsafe_allow_html=True)
+st.markdown('<h1 style="color:#FF4B4B;">🐻🐂 Euronext Gap Scanner</h1>', unsafe_allow_html=True)
 
 status = get_market_status()
 
 def to_excel(df):
-    """DataFrame naar Excel-bytes"""
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Signalen')
@@ -91,11 +91,11 @@ if 'daily_df' not in st.session_state or st.button("🔄 Ververs data", type="pr
 
 daily_df = st.session_state.daily_df
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("AEX", status["AEX"])
-col2.metric("US Beurzen", status["US"])
-col3.metric("Signalen vandaag", len(daily_df))
-col4.metric("Opgeslagen", len(st.session_state.saved_signals))
+# --- Header metrics ---
+col1, col2, col3 = st.columns(3)
+col1.metric("Euronext", status)
+col2.metric("Signalen vandaag", len(daily_df))
+col3.metric("Opgeslagen", len(st.session_state.saved_signals))
 
 st.divider()
 
@@ -117,10 +117,12 @@ if not daily_df.empty:
                 st.session_state.saved_signals = current
                 st.success(f"{len(new)} opgeslagen!")
                 st.rerun()
+            else:
+                st.error("Opslaan mislukt.")
         else:
-            st.info("Al opgeslagen.")
+            st.info("Deze signalen zijn al opgeslagen.")
 
-    # HTML tabel
+    # HTML-tabel
     html = '<table class="gap-table"><thead><tr>'
     for col in daily_df.columns:
         html += f'<th>{col}</th>'
@@ -140,7 +142,7 @@ if not daily_df.empty:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # Downloadknoppen – onder elkaar voor zekerheid
+    # Downloadknoppen
     st.markdown("**Download dagelijkse signalen:**")
     st.download_button("📥 Download als CSV", daily_df.to_csv(index=False),
                        file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.csv",
@@ -150,7 +152,7 @@ if not daily_df.empty:
                            file_name=f"daily_signals_{datetime.now().strftime('%Y%m%d')}.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
-        st.warning("Excel‑export niet beschikbaar (openpyxl ontbreekt). Vraag de beheerder om openpyxl toe te voegen aan requirements.txt.")
+        st.warning("Excel-export niet beschikbaar. Controleer of openpyxl in requirements.txt staat.")
 
 else:
     st.success("✅ Geen signalen vandaag.")
@@ -207,4 +209,4 @@ else:
     st.info("Nog geen opgeslagen signalen.")
 
 st.divider()
-st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • AEX + 100 US-bedrijven")
+st.caption("📊 Data via Yahoo Finance (15 min vertraagd) • Euronext Amsterdam & Brussel")
