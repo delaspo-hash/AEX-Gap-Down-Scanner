@@ -70,5 +70,29 @@
     "Gap %": 0.72,
     "Candle %": 1.34,
     "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Ticker": "DSFIR",
+    "Datum": "2026-08-17",
+    "Exchange": "AEX",
+    "Dag N High": 91.04,
+    "Dag N Low": 89.8,
+    "N+1 Open": 88.96,
+    "N+1 Close": 88.38,
+    "Gap %": 0.94,
+    "Candle %": -0.65,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Ticker": "UNA",
+    "Datum": "2026-08-17",
+    "Exchange": "AEX",
+    "Dag N High": 54.29,
+    "Dag N Low": 53.62,
+    "N+1 Open": 53.35,
+    "N+1 Close": 52.95,
+    "Gap %": 0.5,
+    "Candle %": -0.75,
+    "Signaaltype": "Bearish Gap"
   }
 ]
