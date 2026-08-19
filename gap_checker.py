@@ -3,21 +3,58 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import time
 
-# === EURONEXT AMSTERDAM (AEX) ===
+# === EURONEXT AMSTERDAM (AEX) – volledige index ===
 AEX_TICKERS = [
-    "ADYEN.AS", "AGN.AS", "AKZA.AS", "ASM.AS", "ASML.AS",
-    "BESI.AS", "DSFIR.AS", "EXO.AS", "HEIA.AS", "IMCD.AS",
-    "INGA.AS", "KPN.AS", "MT.AS", "PHIA.AS", "PRX.AS",
-    "RAND.AS", "REN.AS", "SHELL.AS", "TKAY.AS", "UNA.AS",
-    "VPK.AS", "WKL.AS"
+    "ADYEN.AS",   # Adyen
+    "AGN.AS",     # Aegon
+    "AKZA.AS",    # Akzo Nobel
+    "ASM.AS",     # ASM International
+    "ASML.AS",    # ASML
+    "BESI.AS",    # BE Semiconductor
+    "DSFIR.AS",   # DSM-Firmenich
+    "EXO.AS",     # Exor
+    "HEIA.AS",    # Heineken
+    "IMCD.AS",    # IMCD
+    "INGA.AS",    # ING Groep
+    "KPN.AS",     # KPN
+    "MT.AS",      # ArcelorMittal
+    "NN.AS",      # NN Group
+    "PHIA.AS",    # Philips
+    "PRX.AS",     # Prosus
+    "RAND.AS",    # Randstad
+    "REN.AS",     # RELX
+    "SHELL.AS",   # Shell
+    "TKAY.AS",    # Just Eat Takeaway
+    "UNA.AS",     # Unilever
+    "UMG.AS",     # Universal Music Group
+    "VPK.AS",     # Koninklijke Vopak
+    "WKL.AS"      # Wolters Kluwer
 ]
 
-# === EURONEXT BRUSSEL (BEL20 + enkele extra) ===
+# === EURONEXT BRUSSEL (BEL20) – volledige index ===
 BEL20_TICKERS = [
-    "ABI.BR", "AGS.BR", "ARGX.BR", "BAR.BR", "COFB.BR",
-    "COLR.BR", "DEME.BR", "ELI.BR", "GBLB.BR", "KBC.BR",
-    "MELE.BR", "PROX.BR", "SOF.BR", "SOLB.BR", "TNET.BR",
-    "UCB.BR", "UMI.BR", "VGP.BR", "WDP.BR"
+    "ABI.BR",     # Anheuser-Busch InBev
+    "ACKB.BR",    # Ackermans & van Haaren
+    "AGS.BR",     # Ageas
+    "APAM.BR",    # Aperam
+    "ARGX.BR",    # argenx
+    "BAR.BR",     # Barco
+    "COFB.BR",    # Cofinimmo
+    "COLR.BR",    # Colruyt
+    "DIE.BR",     # D'Ieteren Group
+    "ELI.BR",     # Elia
+    "GLPG.BR",    # Galapagos
+    "GBLB.BR",    # Groupe Bruxelles Lambert
+    "KBC.BR",     # KBC Groep
+    "MELE.BR",    # Melexis
+    "PROX.BR",    # Proximus
+    "SOF.BR",     # Sofina
+    "SOLB.BR",    # Solvay
+    "TNET.BR",    # Telenet
+    "UCB.BR",     # UCB
+    "UMI.BR",     # Umicore
+    "VGP.BR",     # VGP
+    "WDP.BR"      # Warehouses De Pauw
 ]
 
 def fetch_daily_data(tickers, period="5d"):
@@ -62,9 +99,6 @@ def fetch_today_open_prices(tickers):
         for t in tickers:
             if t in data and not data[t].empty:
                 df = data[t]
-                # De eerste candle van de dag is de opening
-                # Zorg dat we alleen de reguliere sessie hebben; yfinance kan pre-market bevatten,
-                # maar we vertrouwen op de eerste rij na opening.
                 if 'Open' in df.columns:
                     opens[t] = float(df.iloc[0]['Open'])
         if opens:
