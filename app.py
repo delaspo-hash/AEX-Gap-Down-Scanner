@@ -14,7 +14,7 @@ except ImportError:
     EXCEL_OK = False
 
 REPO = "delaspo-hash/AEX-Gap-Down-Scanner"
-SAVED_FILE = "saved_signals.json"
+SAVED_FILE = "saved_signals_v2.json"   # nieuwe opslag, oude signalen worden niet gemengd
 GITHUB_API = f"https://api.github.com/repos/{REPO}/contents/{SAVED_FILE}"
 TOKEN = st.secrets["GITHUB_TOKEN"]
 HEADERS = {"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.v3+json"}
@@ -78,18 +78,13 @@ def save_saved_signals(signals_list):
         return False
 
 def safe_sort(df, preferred_order, preferred_ascending):
-    """
-    Sorteert de DataFrame op de kolommen die bestaan, in de gewenste volgorde.
-    Ontbrekende kolommen worden genegeerd.
-    """
     available_cols = [c for c in preferred_order if c in df.columns]
     if not available_cols:
         return df
-    # Pas ascending aan: de bijbehorende waarden ophalen
     ascending_vals = [preferred_ascending[preferred_order.index(c)] for c in available_cols]
     return df.sort_values(available_cols, ascending=ascending_vals)
 
-# --- Initialiseer sessie ---
+# --- Sessiestate ---
 if 'saved_signals' not in st.session_state:
     with st.spinner("Laden opgeslagen signalen..."):
         st.session_state.saved_signals = load_saved_signals()
@@ -100,7 +95,6 @@ if 'daily_df' not in st.session_state or st.button("🔄 Ververs data", type="pr
 
 daily_df = st.session_state.daily_df
 
-# --- Definieer sortering voor dagelijkse df (altijd compleet) ---
 sort_cols = ['Datum', 'Tijdstip', 'Exchange', 'Ticker']
 sort_ascending = [False, False, True, True]
 
@@ -114,7 +108,7 @@ col3.metric("Opgeslagen", len(st.session_state.saved_signals))
 
 st.divider()
 
-st.subheader("📋 Signalen van de laatste handelsdag")
+st.subheader("📋 Openingsgaps van vandaag")
 
 if not daily_df.empty:
     labels = [f"{row['Ticker']} | {row['Datum']} | {row['Signaaltype']}" for _, row in daily_df.iterrows()]
@@ -149,7 +143,7 @@ if not daily_df.empty:
         for col in daily_df.columns:
             val = row[col]
             if isinstance(val, float):
-                if 'Gap %' in col or 'Candle %' in col:
+                if 'Gap %' in col:
                     val = f"{val:.2f}%"
                 else:
                     val = f"{val:.2f}"
@@ -169,7 +163,7 @@ if not daily_df.empty:
     else:
         st.warning("Excel-export niet beschikbaar. Controleer of openpyxl in requirements.txt staat.")
 else:
-    st.success("✅ Geen signalen vandaag.")
+    st.success("✅ Geen openingsgaps vandaag (of de beurs is nog niet geopend).")
 
 st.divider()
 
@@ -177,8 +171,6 @@ st.subheader("📁 Opgeslagen signalen (permanent)")
 
 if st.session_state.saved_signals:
     saved_df = pd.DataFrame(st.session_state.saved_signals)
-
-    # Veilige sortering ook voor opgeslagen signalen (Tijdstip kan ontbreken)
     if not saved_df.empty:
         saved_df = safe_sort(saved_df, sort_cols, sort_ascending)
 
@@ -187,12 +179,12 @@ if st.session_state.saved_signals:
         html += f'<th>{col}</th>'
     html += '</tr></thead><tbody>'
     for _, row in saved_df.iterrows():
-        cls = 'bearish-gap' if row['Signaaltype'] == 'Bearish Gap' else 'bullish-gap'
+        cls = 'bearish-gap' if row.get('Signaaltype') == 'Bearish Gap' else 'bullish-gap'
         html += f'<tr class="{cls}">'
         for col in saved_df.columns:
             val = row[col]
             if isinstance(val, float):
-                if 'Gap %' in col or 'Candle %' in col:
+                if 'Gap %' in col:
                     val = f"{val:.2f}%"
                 else:
                     val = f"{val:.2f}"

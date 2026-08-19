@@ -21,10 +21,7 @@ BEL20_TICKERS = [
 ]
 
 def fetch_ticker_data(tickers, period="5d"):
-    """
-    Downloadt dagelijkse koersdata voor een lijst tickers.
-    Eerst batch, daarna per ticker met pauzes indien nodig.
-    """
+    """Downloadt dagelijkse koersdata voor een lijst tickers."""
     if not tickers:
         return {}
     try:
@@ -36,7 +33,6 @@ def fetch_ticker_data(tickers, period="5d"):
     except:
         pass
 
-    # Fallback: één voor één
     result = {}
     for i, t in enumerate(tickers):
         try:
@@ -51,16 +47,15 @@ def fetch_ticker_data(tickers, period="5d"):
 
 def scan_all_patterns():
     """
-    Scant op Bearish en Bullish Gap.
-    Gebruikt alleen voltooide handelsdagen (dus niet de huidige dag).
-    Tijdstip in Nederlandse tijd.
-    Sorteert op Datum (aflopend), Tijdstip (aflopend), Exchange (oplopend), Ticker (oplopend).
+    Scant op openingsgaps van vandaag t.o.v. gisteren.
+    Alleen vandaag: open vandaag < low gisteren (bearish) of > high gisteren (bullish).
+    Retourneert DataFrame met kolommen: Datum, Tijdstip, Exchange, Ticker,
+    Vorige High, Vorige Low, Open Vandaag, Gap %, Signaaltype.
     """
     all_tickers = AEX_TICKERS + BEL20_TICKERS
     batch_size = 50
     results = []
 
-    # Nederlandse tijd nu
     nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
     today_nl = nederland_nu.date()
     scan_time = nederland_nu.strftime('%H:%M:%S')
@@ -75,27 +70,27 @@ def scan_all_patterns():
             if df is None or len(df) < 2:
                 continue
             try:
-                # Kolommen opschonen en index naar datetime
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.droplevel(1)
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
 
-                # **Alleen voltooide handelsdagen**: datum < vandaag (Nederlandse tijd)
-                df = df[df.index.date < today_nl]
-                if len(df) < 2:
+                # Zoek de rij van vandaag en de rij van gisteren
+                df_today = df[df.index.date == today_nl]
+                if df_today.empty:
+                    continue
+                today_row = df_today.iloc[-1]
+                open_today = float(today_row['Open'])
+                if pd.isna(open_today):
                     continue
 
-                # Laatste twee voltooide dagen: N (eergisteren), N+1 (gisteren)
-                dag_n = df.iloc[-2]
-                dag_n1 = df.iloc[-1]
-
-                low_n = float(dag_n['Low'])
-                high_n = float(dag_n['High'])
-                open_n1 = float(dag_n1['Open'])
-                close_n1 = float(dag_n1['Close'])
-
-                date_n1 = dag_n1.name.strftime('%Y-%m-%d') if hasattr(dag_n1.name, 'strftime') else str(dag_n1.name)[:10]
+                # Gisteren = de laatste rij vóór vandaag
+                df_before = df[df.index.date < today_nl]
+                if df_before.empty:
+                    continue
+                yesterday_row = df_before.iloc[-1]
+                prev_high = float(yesterday_row['High'])
+                prev_low = float(yesterday_row['Low'])
 
                 if ticker.endswith('.AS'):
                     exchange = "Amsterdam"
@@ -107,39 +102,33 @@ def scan_all_patterns():
                     exchange = "Onbekend"
                     ticker_clean = ticker
 
-                # --- Bearish Gap ---
-                if open_n1 < low_n and close_n1 < open_n1:
-                    gap_pct = ((low_n - open_n1) / low_n) * 100
-                    candle_pct = ((close_n1 - open_n1) / open_n1) * 100
+                # --- Bearish Gap (open < low gisteren) ---
+                if open_today < prev_low:
+                    gap_pct = ((prev_low - open_today) / prev_low) * 100
                     results.append({
-                        'Datum': date_n1,
+                        'Datum': today_nl.strftime('%Y-%m-%d'),
                         'Tijdstip': scan_time,
                         'Exchange': exchange,
                         'Ticker': ticker_clean,
-                        'Dag N High': round(high_n, 2),
-                        'Dag N Low': round(low_n, 2),
-                        'N+1 Open': round(open_n1, 2),
-                        'N+1 Close': round(close_n1, 2),
+                        'Vorige High': round(prev_high, 2),
+                        'Vorige Low': round(prev_low, 2),
+                        'Open Vandaag': round(open_today, 2),
                         'Gap %': round(gap_pct, 2),
-                        'Candle %': round(candle_pct, 2),
                         'Signaaltype': 'Bearish Gap'
                     })
 
-                # --- Bullish Gap ---
-                if open_n1 > high_n and close_n1 > open_n1:
-                    gap_pct = ((open_n1 - high_n) / high_n) * 100
-                    candle_pct = ((close_n1 - open_n1) / open_n1) * 100
+                # --- Bullish Gap (open > high gisteren) ---
+                if open_today > prev_high:
+                    gap_pct = ((open_today - prev_high) / prev_high) * 100
                     results.append({
-                        'Datum': date_n1,
+                        'Datum': today_nl.strftime('%Y-%m-%d'),
                         'Tijdstip': scan_time,
                         'Exchange': exchange,
                         'Ticker': ticker_clean,
-                        'Dag N High': round(high_n, 2),
-                        'Dag N Low': round(low_n, 2),
-                        'N+1 Open': round(open_n1, 2),
-                        'N+1 Close': round(close_n1, 2),
+                        'Vorige High': round(prev_high, 2),
+                        'Vorige Low': round(prev_low, 2),
+                        'Open Vandaag': round(open_today, 2),
                         'Gap %': round(gap_pct, 2),
-                        'Candle %': round(candle_pct, 2),
                         'Signaaltype': 'Bullish Gap'
                     })
 
