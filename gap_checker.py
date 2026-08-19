@@ -47,10 +47,9 @@ def fetch_ticker_data(tickers, period="5d"):
 
 def scan_all_patterns():
     """
-    Scant op openingsgaps van vandaag t.o.v. gisteren.
-    Alleen vandaag: open vandaag < low gisteren (bearish) of > high gisteren (bullish).
-    Retourneert DataFrame met kolommen: Datum, Tijdstip, Exchange, Ticker,
-    Vorige High, Vorige Low, Open Vandaag, Gap %, Signaaltype.
+    Scant op openingsgaps van vandaag t.o.v. de verwachte vorige handelsdag.
+    Vergelijkt de openingskoers van vandaag met de high/low van die vorige dag.
+    Als de verwachte vorige dag ontbreekt, wordt het aandeel overgeslagen.
     """
     all_tickers = AEX_TICKERS + BEL20_TICKERS
     batch_size = 50
@@ -59,6 +58,12 @@ def scan_all_patterns():
     nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
     today_nl = nederland_nu.date()
     scan_time = nederland_nu.strftime('%H:%M:%S')
+
+    # Verwachte vorige handelsdag bepalen
+    if today_nl.weekday() == 0:  # maandag -> vrijdag
+        expected_prev_date = today_nl - timedelta(days=3)
+    else:
+        expected_prev_date = today_nl - timedelta(days=1)
 
     for i in range(0, len(all_tickers), batch_size):
         batch = all_tickers[i:i+batch_size]
@@ -75,7 +80,7 @@ def scan_all_patterns():
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
 
-                # Zoek de rij van vandaag en de rij van gisteren
+                # Rij van vandaag moet aanwezig zijn
                 df_today = df[df.index.date == today_nl]
                 if df_today.empty:
                     continue
@@ -84,13 +89,13 @@ def scan_all_patterns():
                 if pd.isna(open_today):
                     continue
 
-                # Gisteren = de laatste rij vóór vandaag
-                df_before = df[df.index.date < today_nl]
-                if df_before.empty:
+                # Rij van de verwachte vorige handelsdag moet exact bestaan
+                df_prev = df[df.index.date == expected_prev_date]
+                if df_prev.empty:
                     continue
-                yesterday_row = df_before.iloc[-1]
-                prev_high = float(yesterday_row['High'])
-                prev_low = float(yesterday_row['Low'])
+                prev_row = df_prev.iloc[-1]
+                prev_high = float(prev_row['High'])
+                prev_low = float(prev_row['Low'])
 
                 if ticker.endswith('.AS'):
                     exchange = "Amsterdam"
@@ -102,7 +107,7 @@ def scan_all_patterns():
                     exchange = "Onbekend"
                     ticker_clean = ticker
 
-                # --- Bearish Gap (open < low gisteren) ---
+                # --- Bearish Gap (open < low vorige dag) ---
                 if open_today < prev_low:
                     gap_pct = ((prev_low - open_today) / prev_low) * 100
                     results.append({
@@ -117,7 +122,7 @@ def scan_all_patterns():
                         'Signaaltype': 'Bearish Gap'
                     })
 
-                # --- Bullish Gap (open > high gisteren) ---
+                # --- Bullish Gap (open > high vorige dag) ---
                 if open_today > prev_high:
                     gap_pct = ((open_today - prev_high) / prev_high) * 100
                     results.append({
