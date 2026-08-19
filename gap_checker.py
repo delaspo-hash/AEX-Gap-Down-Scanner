@@ -21,7 +21,10 @@ BEL20_TICKERS = [
 ]
 
 def fetch_ticker_data(tickers, period="5d"):
-    """Downloadt dagelijkse koersdata voor een lijst tickers."""
+    """
+    Downloadt dagelijkse koersdata voor een lijst tickers.
+    Eerst batch, daarna per ticker met pauzes indien nodig.
+    """
     if not tickers:
         return {}
     try:
@@ -33,6 +36,7 @@ def fetch_ticker_data(tickers, period="5d"):
     except:
         pass
 
+    # Fallback: één voor één
     result = {}
     for i, t in enumerate(tickers):
         try:
@@ -47,15 +51,19 @@ def fetch_ticker_data(tickers, period="5d"):
 
 def scan_all_patterns():
     """
-    Scant op Bearish en Bullish Gap, voegt een tijdstip toe en sorteert
-    op Datum (aflopend), Tijdstip (aflopend), Exchange (oplopend), Ticker (oplopend).
+    Scant op Bearish en Bullish Gap.
+    Gebruikt alleen voltooide handelsdagen (dus niet de huidige dag).
+    Tijdstip in Nederlandse tijd.
+    Sorteert op Datum (aflopend), Tijdstip (aflopend), Exchange (oplopend), Ticker (oplopend).
     """
     all_tickers = AEX_TICKERS + BEL20_TICKERS
     batch_size = 50
     results = []
 
-    # Eén tijdstip voor de hele scan
-    scan_time = datetime.now().strftime('%H:%M:%S')
+    # Nederlandse tijd nu
+    nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
+    today_nl = nederland_nu.date()
+    scan_time = nederland_nu.strftime('%H:%M:%S')
 
     for i in range(0, len(all_tickers), batch_size):
         batch = all_tickers[i:i+batch_size]
@@ -67,13 +75,18 @@ def scan_all_patterns():
             if df is None or len(df) < 2:
                 continue
             try:
+                # Kolommen opschonen en index naar datetime
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.droplevel(1)
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
 
+                # **Alleen voltooide handelsdagen**: datum < vandaag (Nederlandse tijd)
+                df = df[df.index.date < today_nl]
                 if len(df) < 2:
                     continue
+
+                # Laatste twee voltooide dagen: N (eergisteren), N+1 (gisteren)
                 dag_n = df.iloc[-2]
                 dag_n1 = df.iloc[-1]
 
@@ -135,7 +148,6 @@ def scan_all_patterns():
 
     df = pd.DataFrame(results)
     if not df.empty:
-        # Sorteren: Datum aflopend, Tijdstip aflopend, Exchange oplopend, Ticker oplopend
         df = df.sort_values(
             ['Datum', 'Tijdstip', 'Exchange', 'Ticker'],
             ascending=[False, False, True, True]
@@ -143,7 +155,7 @@ def scan_all_patterns():
     return df
 
 def get_market_status():
-    """Bepaal of Euronext (Amsterdam & Brussel) geopend is."""
+    """Bepaal of Euronext (Amsterdam & Brussel) geopend is (Nederlandse tijd)."""
     now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
     minute = now.minute
