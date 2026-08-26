@@ -3,65 +3,89 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import time
 
-# === EURONEXT AMSTERDAM (AEX) – volledige index ===
-AEX_TICKERS = [
-    "ADYEN.AS",   # Adyen
-    "AGN.AS",     # Aegon
-    "AKZA.AS",    # Akzo Nobel
-    "ASM.AS",     # ASM International
-    "ASML.AS",    # ASML
-    "BESI.AS",    # BE Semiconductor
-    "DSFIR.AS",   # DSM-Firmenich
-    "EXO.AS",     # Exor
-    "HEIA.AS",    # Heineken
-    "IMCD.AS",    # IMCD
-    "INGA.AS",    # ING Groep
-    "KPN.AS",     # KPN
-    "MT.AS",      # ArcelorMittal
-    "NN.AS",      # NN Group
-    "PHIA.AS",    # Philips
-    "PRX.AS",     # Prosus
-    "RAND.AS",    # Randstad
-    "REN.AS",     # RELX
-    "SHELL.AS",   # Shell
-    "TKAY.AS",    # Just Eat Takeaway
-    "UNA.AS",     # Unilever
-    "UMG.AS",     # Universal Music Group
-    "VPK.AS",     # Koninklijke Vopak
-    "WKL.AS"      # Wolters Kluwer
-]
-
-# === EURONEXT BRUSSEL (BEL20) – volledige index ===
-BEL20_TICKERS = [
-    "ABI.BR",     # Anheuser-Busch InBev
-    "ACKB.BR",    # Ackermans & van Haaren
-    "AGS.BR",     # Ageas
-    "APAM.BR",    # Aperam
-    "ARGX.BR",    # argenx
-    "BAR.BR",     # Barco
-    "COFB.BR",    # Cofinimmo
-    "COLR.BR",    # Colruyt
-    "DIE.BR",     # D'Ieteren Group
-    "ELI.BR",     # Elia
-    "GLPG.BR",    # Galapagos
-    "GBLB.BR",    # Groupe Bruxelles Lambert
-    "KBC.BR",     # KBC Groep
-    "MELE.BR",    # Melexis
-    "PROX.BR",    # Proximus
-    "SOF.BR",     # Sofina
-    "SOLB.BR",    # Solvay
-    "TNET.BR",    # Telenet
-    "UCB.BR",     # UCB
-    "UMI.BR",     # Umicore
-    "VGP.BR",     # VGP
-    "WDP.BR"      # Warehouses De Pauw
+# === JOUW EXACTE LIJST VAN 77 AANDELEN ===
+TICKERS = [
+    "AALB.AS",
+    "AABI.BR",
+    "AABN.AS",
+    "AACKB.BR",
+    "AAD.AS",
+    "AADYEN.AS",
+    "AAED.BR",
+    "AAGN.AS",
+    "AAKZA.AS",
+    "AALLFG.AS",
+    "AAPAM.AS",
+    "AARCAD.AS",
+    "AARGX.BR",
+    "AASM.AS",
+    "AASML.AS",
+    "AASRNL.AS",
+    "AAZE.BR",
+    "BAMNB.AS",
+    "BESI.AS",
+    "BFIT.AS",
+    "BNJ.AS",
+    "BREB.BR",
+    "CCEP.AS",
+    "CCENER.BR",
+    "CCMBT.BR",
+    "CCOLR.BR",
+    "CCSG.AS",
+    "CCTPNV.AS",
+    "CCVC.AS",
+    "DDEME.BR",
+    "DDIE.BR",
+    "DSFIR.AS",
+    "EELI.BR",
+    "EXO.AS",
+    "FER.AS",
+    "GBLB.BR",
+    "HHAL.AS",
+    "HEIA.AS",
+    "HEIJM.AS",
+    "HEIO.AS",
+    "IMCD.AS",
+    "INGA.AS",
+    "INPST.AS",
+    "KBCA.BR",
+    "KPN.AS",
+    "LOTB.BR",
+    "MELE.BR",
+    "MICC.AS",
+    "MT.AS",
+    "NN.AS",
+    "NNRP.AS",
+    "PPHIA.AS",
+    "PPROX.BR",
+    "PPRX.AS",
+    "RAND.AS",
+    "REINA.AS",
+    "REN.AS",
+    "SBMO.AS",
+    "SHELL.AS",
+    "SHUR.BR",
+    "SOF.BR",
+    "SOLB.BR",
+    "SWICH.AS",
+    "SYENS.BR",
+    "TTHEON.AS",
+    "TITC.BR",
+    "TUB.BR",
+    "UCB.BR",
+    "UUMG.AS",
+    "UUMI.BR",
+    "UUNA.AS",
+    "VGP.BR",
+    "VIO.BR",
+    "VLK.AS",
+    "VPK.AS",
+    "WDP.BR",
+    "WKL.AS"
 ]
 
 def fetch_daily_data(tickers, period="5d"):
-    """
-    Haalt dagelijkse koersdata op voor een lijst tickers.
-    Retourneert dict {ticker: DataFrame} of lege dict.
-    """
+    """Haalt dagelijkse koersdata op voor een lijst tickers."""
     if not tickers:
         return {}
     try:
@@ -86,13 +110,9 @@ def fetch_daily_data(tickers, period="5d"):
     return result
 
 def fetch_today_open_prices(tickers):
-    """
-    Haalt voor vandaag de openingskoers op via intraday (1-minuut) data.
-    Retourneert dict {ticker: float open_price} of leeg.
-    """
+    """Haalt voor vandaag de openingskoers op via intraday (1-minuut) data."""
     if not tickers:
         return {}
-    # Probeer batch-download
     try:
         data = yf.download(tickers, period="1d", interval="1m", progress=False, group_by='ticker')
         opens = {}
@@ -106,7 +126,6 @@ def fetch_today_open_prices(tickers):
     except:
         pass
 
-    # Fallback: één voor één
     opens = {}
     for t in tickers:
         try:
@@ -123,7 +142,7 @@ def scan_all_patterns():
     Gebruikt dagdata voor vorige handelsdagen en intraday-data voor de opening van vandaag.
     Alleen als beide datums correct aanwezig zijn, wordt het aandeel getoond.
     """
-    all_tickers = AEX_TICKERS + BEL20_TICKERS
+    all_tickers = TICKERS
     batch_size = 50
     results = []
 
@@ -137,24 +156,18 @@ def scan_all_patterns():
     else:
         expected_prev_date = today_nl - timedelta(days=1)
 
-    # Dagdata ophalen (vorige handelsdagen)
     daily_data = fetch_daily_data(all_tickers, period="5d")
-
-    # Openingskoersen van vandaag ophalen (intraday)
     today_opens = fetch_today_open_prices(all_tickers)
 
-    # Combineer
     for ticker, df in daily_data.items():
         if df is None or len(df) < 1:
             continue
         try:
-            # Kolommen opschonen en index datetime maken
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.droplevel(1)
             if not isinstance(df.index, pd.DatetimeIndex):
                 df.index = pd.to_datetime(df.index)
 
-            # Zoek de verwachte vorige handelsdag
             df_prev = df[df.index.date == expected_prev_date]
             if df_prev.empty:
                 continue
@@ -162,11 +175,11 @@ def scan_all_patterns():
             prev_high = float(prev_row['High'])
             prev_low = float(prev_row['Low'])
 
-            # Openingskoers van vandaag
             open_today = today_opens.get(ticker)
             if open_today is None or pd.isna(open_today):
                 continue
 
+            # Bepaal exchange uit de ticker
             if ticker.endswith('.AS'):
                 exchange = "Amsterdam"
                 ticker_clean = ticker.replace('.AS', '')
@@ -177,7 +190,7 @@ def scan_all_patterns():
                 exchange = "Onbekend"
                 ticker_clean = ticker
 
-            # --- Bearish Gap (open < low vorige dag) ---
+            # Bearish Gap
             if open_today < prev_low:
                 gap_pct = ((prev_low - open_today) / prev_low) * 100
                 results.append({
@@ -192,7 +205,7 @@ def scan_all_patterns():
                     'Signaaltype': 'Bearish Gap'
                 })
 
-            # --- Bullish Gap (open > high vorige dag) ---
+            # Bullish Gap
             if open_today > prev_high:
                 gap_pct = ((open_today - prev_high) / prev_high) * 100
                 results.append({
@@ -206,8 +219,7 @@ def scan_all_patterns():
                     'Gap %': round(gap_pct, 2),
                     'Signaaltype': 'Bullish Gap'
                 })
-
-        except Exception:
+        except:
             continue
 
     df = pd.DataFrame(results)
@@ -219,7 +231,7 @@ def scan_all_patterns():
     return df
 
 def get_market_status():
-    """Bepaal of Euronext (Amsterdam & Brussel) geopend is (Nederlandse tijd)."""
+    """Bepaal of Euronext geopend is (Nederlandse tijd)."""
     now = datetime.now(timezone.utc) + timedelta(hours=2)
     hour = now.hour
     minute = now.minute
@@ -227,7 +239,6 @@ def get_market_status():
 
     if weekday >= 5:
         return "🔴 Weekend - Euronext gesloten"
-
     if hour < 9:
         return "⏳ Euronext nog niet open"
     elif hour < 17 or (hour == 17 and minute < 30):
