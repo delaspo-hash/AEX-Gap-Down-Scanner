@@ -5,28 +5,28 @@ import time
 import requests
 from io import StringIO
 
-# === JOUW EXACTE LIJST VAN 77 AANDELEN ===
+# === GECORRIGEERDE TICKERLIJST ===
 TICKERS = [
-    "AALB.AS", "AABI.BR", "AABN.AS", "AACKB.BR", "AAD.AS",
-    "AADYEN.AS", "AAED.BR", "AAGN.AS", "AAKZA.AS", "AALLFG.AS",
-    "AAPAM.AS", "AARCAD.AS", "AARGX.BR", "AASM.AS", "AASML.AS",
-    "AASRNL.AS", "AAZE.BR", "BAMNB.AS", "BESI.AS", "BFIT.AS",
-    "BNJ.AS", "BREB.BR", "CCEP.AS", "CCENER.BR", "CCMBT.BR",
-    "CCOLR.BR", "CCSG.AS", "CCTPNV.AS", "CCVC.AS", "DDEME.BR",
-    "DDIE.BR", "DSFIR.AS", "EELI.BR", "EXO.AS", "FER.AS",
-    "GBLB.BR", "HHAL.AS", "HEIA.AS", "HEIJM.AS", "HEIO.AS",
-    "IMCD.AS", "INGA.AS", "INPST.AS", "KBCA.BR", "KPN.AS",
+    "AALB.AS", "ABI.BR", "ABN.AS", "ACKB.BR", "AD.AS",
+    "ADYEN.AS", "AED.BR", "AGN.AS", "AKZA.AS", "ALLFG.AS",
+    "APAM.AS", "ARCAD.AS", "ARGX.BR", "ASM.AS", "ASML.AS",
+    "ASRNL.AS", "AZE.BR", "BAMNB.AS", "BESI.AS", "BFIT.AS",
+    "BNJ.AS", "BREB.BR", "CCEP.AS", "CENER.BR", "CMBT.BR",
+    "COLR.BR", "CSG.AS", "CTPNV.AS", "CVC.AS", "DEME.BR",
+    "DIE.BR", "DSFIR.AS", "ELI.BR", "EXO.AS", "FER.AS",
+    "GBLB.BR", "HAL.AS", "HEIA.AS", "HEIJM.AS", "HEIO.AS",
+    "IMCD.AS", "INGA.AS", "INPST.AS", "KBC.BR", "KPN.AS",
     "LOTB.BR", "MELE.BR", "MICC.AS", "MT.AS", "NN.AS",
-    "NNRP.AS", "PPHIA.AS", "PPROX.BR", "PPRX.AS", "RAND.AS",
+    "NRP.AS", "PHIA.AS", "PROX.BR", "PRX.AS", "RAND.AS",
     "REINA.AS", "REN.AS", "SBMO.AS", "SHELL.AS", "SHUR.BR",
-    "SOF.BR", "SOLB.BR", "SWICH.AS", "SYENS.BR", "TTHEON.AS",
-    "TITC.BR", "TUB.BR", "UCB.BR", "UUMG.AS", "UUMI.BR",
-    "UUNA.AS", "VGP.BR", "VIO.BR", "VLK.AS", "VPK.AS",
+    "SOF.BR", "SOLB.BR", "SWICH.AS", "SYENS.BR", "THEON.AS",
+    "TITC.BR", "TUB.BR", "UCB.BR", "UMG.AS", "UMI.BR",
+    "UNA.AS", "VGP.BR", "VIO.BR", "VLK.AS", "VPK.AS",
     "WDP.BR", "WKL.AS"
 ]
 
 def yahoo_to_stooq(ticker):
-    """Zet een Yahoo-ticker om naar een Stooq-symbool (probeer .nl en .be)."""
+    """Zet Yahoo-ticker om naar Stooq-symbool."""
     if ticker.endswith('.AS'):
         return ticker.replace('.AS', '').lower() + '.nl'
     elif ticker.endswith('.BR'):
@@ -35,17 +35,12 @@ def yahoo_to_stooq(ticker):
         return ticker.lower()
 
 def fetch_daily_data_stooq(ticker, days=15):
-    """
-    Haalt dagelijkse koersdata op van Stooq voor een ticker.
-    Retourneert een DataFrame met index=Date en kolommen Open, High, Low, Close.
-    """
+    """Haalt dagelijkse data op van Stooq voor één ticker."""
     symbol = yahoo_to_stooq(ticker)
-    # Bepaal datumbereik: vanaf (vandaag - days) tot vandaag
-    end_date = datetime.now(timezone.utc) + timedelta(hours=2)  # NL tijd
+    end_date = datetime.now(timezone.utc) + timedelta(hours=2)
     start_date = end_date - timedelta(days=days)
     d1 = start_date.strftime('%Y%m%d')
     d2 = end_date.strftime('%Y%m%d')
-
     url = f"https://stooq.com/q/d/l/?s={symbol}&d1={d1}&d2={d2}&i=d"
     try:
         resp = requests.get(url, timeout=10)
@@ -53,8 +48,7 @@ def fetch_daily_data_stooq(ticker, days=15):
             df = pd.read_csv(StringIO(resp.text))
             if df.empty:
                 return None
-            # Stooq kolommen: Date,Open,High,Low,Close,Volume
-            if 'Date' not in df.columns or 'Low' not in df.columns or 'High' not in df.columns or 'Open' not in df.columns or 'Close' not in df.columns:
+            if not {'Date','Open','High','Low','Close'}.issubset(df.columns):
                 return None
             df['Date'] = pd.to_datetime(df['Date'])
             df = df.set_index('Date')
@@ -65,7 +59,7 @@ def fetch_daily_data_stooq(ticker, days=15):
     return None
 
 def fetch_daily_data_stooq_for_all(tickers):
-    """Haalt dagelijkse data op voor alle tickers via Stooq (met kleine pauzes)."""
+    """Haalt dagelijkse Stooq-data op voor alle tickers."""
     result = {}
     for i, t in enumerate(tickers):
         df = fetch_daily_data_stooq(t)
@@ -76,13 +70,9 @@ def fetch_daily_data_stooq_for_all(tickers):
     return result
 
 def fetch_today_open_prices_yahoo(tickers):
-    """
-    Haalt voor vandaag de openingskoers op via Yahoo intraday (1-minuut).
-    Retourneert dict {ticker: float open_price}
-    """
+    """Haalt openingskoers van vandaag via Yahoo intraday (1-minuut)."""
     if not tickers:
         return {}
-    # Probeer batch
     try:
         data = yf.download(tickers, period="1d", interval="1m", progress=False, group_by='ticker')
         opens = {}
@@ -95,8 +85,6 @@ def fetch_today_open_prices_yahoo(tickers):
             return opens
     except:
         pass
-
-    # Fallback per ticker
     opens = {}
     for t in tickers:
         try:
@@ -108,26 +96,19 @@ def fetch_today_open_prices_yahoo(tickers):
     return opens
 
 def scan_all_patterns():
-    """
-    Scant op openingsgaps van vandaag t.o.v. de laatste handelsdag vóór vandaag.
-    Historische dagdata van Stooq; openingskoers vandaag van Yahoo intraday.
-    Alleen als beide beschikbaar zijn, wordt het aandeel getoond.
-    """
+    """Scant op openingsgaps van vandaag t.o.v. laatste handelsdag vóór vandaag."""
     nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
     today_nl = nederland_nu.date()
     scan_time = nederland_nu.strftime('%H:%M:%S')
 
-    # Haal data op
     daily_data = fetch_daily_data_stooq_for_all(TICKERS)
     today_opens = fetch_today_open_prices_yahoo(TICKERS)
 
     results = []
-
     for ticker, df in daily_data.items():
         if df is None or len(df) < 1:
             continue
         try:
-            # Zoek laatste handelsdag vóór vandaag (exclusief vandaag)
             df_before = df[df.index.date < today_nl]
             if df_before.empty:
                 continue
@@ -139,7 +120,6 @@ def scan_all_patterns():
             if open_today is None or pd.isna(open_today):
                 continue
 
-            # Bepaal exchange en schone ticker
             if ticker.endswith('.AS'):
                 exchange = "Amsterdam"
                 ticker_clean = ticker.replace('.AS', '')
@@ -150,7 +130,6 @@ def scan_all_patterns():
                 exchange = "Onbekend"
                 ticker_clean = ticker
 
-            # Bearish Gap
             if open_today < prev_low:
                 gap_pct = ((prev_low - open_today) / prev_low) * 100
                 results.append({
@@ -165,7 +144,6 @@ def scan_all_patterns():
                     'Signaaltype': 'Bearish Gap'
                 })
 
-            # Bullish Gap
             if open_today > prev_high:
                 gap_pct = ((open_today - prev_high) / prev_high) * 100
                 results.append({
@@ -196,7 +174,6 @@ def get_market_status():
     hour = now.hour
     minute = now.minute
     weekday = now.weekday()
-
     if weekday >= 5:
         return "🔴 Weekend - Euronext gesloten"
     if hour < 9:
