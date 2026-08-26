@@ -3,85 +3,85 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import time
 
-# === JOUW EXACTE LIJST VAN 77 AANDELEN ===
+# === 77 geselecteerde aandelen (Euronext Amsterdam & Brussel) ===
 TICKERS = [
-    "AALB.AS",
-    "AABI.BR",
-    "AABN.AS",
-    "AACKB.BR",
-    "AAD.AS",
-    "AADYEN.AS",
-    "AAED.BR",
-    "AAGN.AS",
-    "AAKZA.AS",
-    "AALLFG.AS",
-    "AAPAM.AS",
-    "AARCAD.AS",
-    "AARGX.BR",
-    "AASM.AS",
-    "AASML.AS",
-    "AASRNL.AS",
-    "AAZE.BR",
-    "BAMNB.AS",
-    "BESI.AS",
-    "BFIT.AS",
-    "BNJ.AS",
-    "BREB.BR",
-    "CCEP.AS",
-    "CCENER.BR",
-    "CCMBT.BR",
-    "CCOLR.BR",
-    "CCSG.AS",
-    "CCTPNV.AS",
-    "CCVC.AS",
-    "DDEME.BR",
-    "DDIE.BR",
-    "DSFIR.AS",
-    "EELI.BR",
-    "EXO.AS",
-    "FER.AS",
-    "GBLB.BR",
-    "HHAL.AS",
-    "HEIA.AS",
-    "HEIJM.AS",
-    "HEIO.AS",
-    "IMCD.AS",
-    "INGA.AS",
-    "INPST.AS",
-    "KBCA.BR",
-    "KPN.AS",
-    "LOTB.BR",
-    "MELE.BR",
-    "MICC.AS",
-    "MT.AS",
-    "NN.AS",
-    "NNRP.AS",
-    "PPHIA.AS",
-    "PPROX.BR",
-    "PPRX.AS",
-    "RAND.AS",
-    "REINA.AS",
-    "REN.AS",
-    "SBMO.AS",
-    "SHELL.AS",
-    "SHUR.BR",
-    "SOF.BR",
-    "SOLB.BR",
-    "SWICH.AS",
-    "SYENS.BR",
-    "TTHEON.AS",
-    "TITC.BR",
-    "TUB.BR",
-    "UCB.BR",
-    "UUMG.AS",
-    "UUMI.BR",
-    "UUNA.AS",
-    "VGP.BR",
-    "VIO.BR",
-    "VLK.AS",
-    "VPK.AS",
-    "WDP.BR",
-    "WKL.AS"
+    "AALB.AS",     # Aalberts
+    "ABI.BR",      # Anheuser-Busch InBev
+    "ABN.AS",      # ABN AMRO
+    "ACKB.BR",     # Ackermans & van Haaren
+    "AD.AS",       # Ahold Delhaize
+    "ADYEN.AS",    # Adyen
+    "AED.BR",      # Aedifica
+    "AGN.AS",      # Aegon
+    "AKZA.AS",     # Akzo Nobel
+    "ALLFG.AS",    # Allfunds
+    "APAM.AS",     # Aperam
+    "ARCAD.AS",    # Arcadis
+    "ARGX.BR",     # argenx
+    "ASM.AS",      # ASM International
+    "ASML.AS",     # ASML
+    "ASRNL.AS",    # ASR Nederland
+    "AZE.BR",      # Azelis
+    "BAMNB.AS",    # BAM Groep
+    "BESI.AS",     # BE Semiconductor
+    "BFIT.AS",     # Basic-Fit
+    "BNJ.AS",      # (onbekend, blijft als gegeven)
+    "BREB.BR",     # Brederode
+    "CCEP.AS",     # Coca-Cola Europacific Partners
+    "CENER.BR",    # Cenergy Holdings
+    "CMBT.BR",     # Compagnie du Bois Sauvage
+    "COLR.BR",     # Colruyt
+    "CSG.AS",      # (onbekend)
+    "CTPNV.AS",    # CTP N.V.
+    "CVC.AS",      # CVC Capital Partners
+    "DEME.BR",     # DEME
+    "DIE.BR",      # D'Ieteren Group
+    "DSFIR.AS",    # DSM-Firmenich
+    "ELI.BR",      # Elia
+    "EXO.AS",      # Exor
+    "FER.AS",      # Ferrovial
+    "GBLB.BR",     # Groupe Bruxelles Lambert
+    "HAL.AS",      # HAL Trust
+    "HEIA.AS",     # Heineken
+    "HEIJM.AS",    # Heijmans
+    "HEIO.AS",     # Heineken Holding
+    "IMCD.AS",     # IMCD
+    "INGA.AS",     # ING Groep
+    "INPST.AS",    # InPost
+    "KBC.BR",      # KBC Groep
+    "KPN.AS",      # KPN
+    "LOTB.BR",     # Lotus Bakeries
+    "MELE.BR",     # Melexis
+    "MICC.AS",     # (onbekend)
+    "MT.AS",       # ArcelorMittal
+    "NN.AS",       # NN Group
+    "NRP.AS",      # NEPI Rockcastle
+    "PHIA.AS",     # Philips
+    "PROX.BR",     # Proximus
+    "PRX.AS",      # Prosus
+    "RAND.AS",     # Randstad
+    "REINA.AS",    # (onbekend)
+    "REN.AS",      # RELX
+    "SBMO.AS",     # SBM Offshore
+    "SHELL.AS",    # Shell
+    "SHUR.BR",     # Shurgard
+    "SOF.BR",      # Sofina
+    "SOLB.BR",     # Solvay
+    "SWICH.AS",    # (onbekend)
+    "SYENS.BR",    # Syensqo
+    "THEON.AS",    # Theon International
+    "TITC.BR",     # Titan Cement International
+    "TUB.BR",      # Tubize
+    "UCB.BR",      # UCB
+    "UMG.AS",      # Universal Music Group
+    "UMI.BR",      # Umicore
+    "UNA.AS",      # Unilever
+    "VGP.BR",      # VGP
+    "VIO.BR",      # Viohalco
+    "VLK.AS",      # Van Lanschot Kempen
+    "VPK.AS",      # Vopak
+    "WDP.BR",      # Warehouses De Pauw
+    "WKL.AS"       # Wolters Kluwer
 ]
 
 def fetch_daily_data(tickers, period="5d"):
@@ -179,7 +179,6 @@ def scan_all_patterns():
             if open_today is None or pd.isna(open_today):
                 continue
 
-            # Bepaal exchange uit de ticker
             if ticker.endswith('.AS'):
                 exchange = "Amsterdam"
                 ticker_clean = ticker.replace('.AS', '')
