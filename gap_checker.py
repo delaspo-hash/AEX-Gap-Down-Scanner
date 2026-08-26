@@ -2,10 +2,8 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 import time
-import requests
-from io import StringIO
 
-# === GECORRIGEERDE TICKERLIJST ===
+# === GECORRIGEERDE TICKERLIJST (zonder dubbele beginletters) ===
 TICKERS = [
     "AALB.AS", "ABI.BR", "ABN.AS", "ACKB.BR", "AD.AS",
     "ADYEN.AS", "AED.BR", "AGN.AS", "AKZA.AS", "ALLFG.AS",
@@ -25,48 +23,33 @@ TICKERS = [
     "WDP.BR", "WKL.AS"
 ]
 
-def yahoo_to_stooq(ticker):
-    """Zet Yahoo-ticker om naar Stooq-symbool."""
-    if ticker.endswith('.AS'):
-        return ticker.replace('.AS', '').lower() + '.nl'
-    elif ticker.endswith('.BR'):
-        return ticker.replace('.BR', '').lower() + '.be'
-    else:
-        return ticker.lower()
-
-def fetch_daily_data_stooq(ticker, days=15):
-    """Haalt dagelijkse data op van Stooq voor één ticker."""
-    symbol = yahoo_to_stooq(ticker)
-    end_date = datetime.now(timezone.utc) + timedelta(hours=2)
-    start_date = end_date - timedelta(days=days)
-    d1 = start_date.strftime('%Y%m%d')
-    d2 = end_date.strftime('%Y%m%d')
-    url = f"https://stooq.com/q/d/l/?s={symbol}&d1={d1}&d2={d2}&i=d"
+def fetch_daily_data_yahoo(tickers, period="10d"):
+    """
+    Haalt dagelijkse koersdata op van Yahoo voor een lijst tickers.
+    Retourneert dict {ticker: DataFrame} of lege dict.
+    """
+    if not tickers:
+        return {}
     try:
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200 and resp.text.strip():
-            df = pd.read_csv(StringIO(resp.text))
-            if df.empty:
-                return None
-            if not {'Date','Open','High','Low','Close'}.issubset(df.columns):
-                return None
-            df['Date'] = pd.to_datetime(df['Date'])
-            df = df.set_index('Date')
-            df = df.sort_index()
-            return df
+        data = yf.download(tickers, period=period, interval="1d", progress=False, group_by='ticker')
+        if len(tickers) == 1:
+            data = {tickers[0]: data}
+        if data and any(not df.empty for df in data.values()):
+            return data
     except:
         pass
-    return None
 
-def fetch_daily_data_stooq_for_all(tickers):
-    """Haalt dagelijkse Stooq-data op voor alle tickers."""
+    # Fallback: één voor één
     result = {}
     for i, t in enumerate(tickers):
-        df = fetch_daily_data_stooq(t)
-        if df is not None and len(df) > 0:
-            result[t] = df
+        try:
+            df = yf.download(t, period=period, interval="1d", progress=False)
+            if not df.empty:
+                result[t] = df
+        except:
+            continue
         if (i + 1) % 10 == 0:
-            time.sleep(0.2)
+            time.sleep(0.5)
     return result
 
 def fetch_today_open_prices_yahoo(tickers):
@@ -85,6 +68,7 @@ def fetch_today_open_prices_yahoo(tickers):
             return opens
     except:
         pass
+
     opens = {}
     for t in tickers:
         try:
@@ -96,23 +80,37 @@ def fetch_today_open_prices_yahoo(tickers):
     return opens
 
 def scan_all_patterns():
-    """Scant op openingsgaps van vandaag t.o.v. laatste handelsdag vóór vandaag."""
+    """
+    Scant op openingsgaps van vandaag t.o.v. de laatste handelsdag vóór vandaag.
+    - Dagelijkse data: Yahoo (laatste beschikbare dag vóór vandaag)
+    - Openingskoers vandaag: Yahoo intraday (1-minuut)
+    Alleen als beide beschikbaar zijn, wordt het aandeel getoond.
+    """
     nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
     today_nl = nederland_nu.date()
     scan_time = nederland_nu.strftime('%H:%M:%S')
 
-    daily_data = fetch_daily_data_stooq_for_all(TICKERS)
+    # Haal dagdata en openingskoersen op
+    daily_data = fetch_daily_data_yahoo(TICKERS, period="10d")
     today_opens = fetch_today_open_prices_yahoo(TICKERS)
 
     results = []
+
     for ticker, df in daily_data.items():
         if df is None or len(df) < 1:
             continue
         try:
+            # Kolommen opschonen
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.droplevel(1)
+            if not isinstance(df.index, pd.DatetimeIndex):
+                df.index = pd.to_datetime(df.index)
+
+            # Laatste handelsdag vóór vandaag (niet strikt gisteren)
             df_before = df[df.index.date < today_nl]
             if df_before.empty:
                 continue
-            prev_row = df_before.iloc[-1]
+            prev_row = df_before.iloc[-1]   # dit is de meest recente handelsdag
             prev_high = float(prev_row['High'])
             prev_low = float(prev_row['Low'])
 
@@ -120,6 +118,7 @@ def scan_all_patterns():
             if open_today is None or pd.isna(open_today):
                 continue
 
+            # Bepaal exchange en schone ticker
             if ticker.endswith('.AS'):
                 exchange = "Amsterdam"
                 ticker_clean = ticker.replace('.AS', '')
@@ -130,6 +129,7 @@ def scan_all_patterns():
                 exchange = "Onbekend"
                 ticker_clean = ticker
 
+            # Bearish Gap
             if open_today < prev_low:
                 gap_pct = ((prev_low - open_today) / prev_low) * 100
                 results.append({
@@ -144,6 +144,7 @@ def scan_all_patterns():
                     'Signaaltype': 'Bearish Gap'
                 })
 
+            # Bullish Gap
             if open_today > prev_high:
                 gap_pct = ((open_today - prev_high) / prev_high) * 100
                 results.append({
