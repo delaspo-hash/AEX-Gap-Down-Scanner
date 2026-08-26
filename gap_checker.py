@@ -3,31 +3,89 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 import time
 
-# === GECORRIGEERDE TICKERLIJST (zonder dubbele beginletters) ===
+# === JOUW EXACTE LIJST VAN 77 AANDELEN ===
 TICKERS = [
-    "AALB.AS", "ABI.BR", "ABN.AS", "ACKB.BR", "AD.AS",
-    "ADYEN.AS", "AED.BR", "AGN.AS", "AKZA.AS", "ALLFG.AS",
-    "APAM.AS", "ARCAD.AS", "ARGX.BR", "ASM.AS", "ASML.AS",
-    "ASRNL.AS", "AZE.BR", "BAMNB.AS", "BESI.AS", "BFIT.AS",
-    "BNJ.AS", "BREB.BR", "CCEP.AS", "CENER.BR", "CMBT.BR",
-    "COLR.BR", "CSG.AS", "CTPNV.AS", "CVC.AS", "DEME.BR",
-    "DIE.BR", "DSFIR.AS", "ELI.BR", "EXO.AS", "FER.AS",
-    "GBLB.BR", "HAL.AS", "HEIA.AS", "HEIJM.AS", "HEIO.AS",
-    "IMCD.AS", "INGA.AS", "INPST.AS", "KBC.BR", "KPN.AS",
-    "LOTB.BR", "MELE.BR", "MICC.AS", "MT.AS", "NN.AS",
-    "NRP.AS", "PHIA.AS", "PROX.BR", "PRX.AS", "RAND.AS",
-    "REINA.AS", "REN.AS", "SBMO.AS", "SHELL.AS", "SHUR.BR",
-    "SOF.BR", "SOLB.BR", "SWICH.AS", "SYENS.BR", "THEON.AS",
-    "TITC.BR", "TUB.BR", "UCB.BR", "UMG.AS", "UMI.BR",
-    "UNA.AS", "VGP.BR", "VIO.BR", "VLK.AS", "VPK.AS",
-    "WDP.BR", "WKL.AS"
+    "AALB.AS",
+    "AABI.BR",
+    "AABN.AS",
+    "AACKB.BR",
+    "AAD.AS",
+    "AADYEN.AS",
+    "AAED.BR",
+    "AAGN.AS",
+    "AAKZA.AS",
+    "AALLFG.AS",
+    "AAPAM.AS",
+    "AARCAD.AS",
+    "AARGX.BR",
+    "AASM.AS",
+    "AASML.AS",
+    "AASRNL.AS",
+    "AAZE.BR",
+    "BAMNB.AS",
+    "BESI.AS",
+    "BFIT.AS",
+    "BNJ.AS",
+    "BREB.BR",
+    "CCEP.AS",
+    "CCENER.BR",
+    "CCMBT.BR",
+    "CCOLR.BR",
+    "CCSG.AS",
+    "CCTPNV.AS",
+    "CCVC.AS",
+    "DDEME.BR",
+    "DDIE.BR",
+    "DSFIR.AS",
+    "EELI.BR",
+    "EXO.AS",
+    "FER.AS",
+    "GBLB.BR",
+    "HHAL.AS",
+    "HEIA.AS",
+    "HEIJM.AS",
+    "HEIO.AS",
+    "IMCD.AS",
+    "INGA.AS",
+    "INPST.AS",
+    "KBCA.BR",
+    "KPN.AS",
+    "LOTB.BR",
+    "MELE.BR",
+    "MICC.AS",
+    "MT.AS",
+    "NN.AS",
+    "NNRP.AS",
+    "PPHIA.AS",
+    "PPROX.BR",
+    "PPRX.AS",
+    "RAND.AS",
+    "REINA.AS",
+    "REN.AS",
+    "SBMO.AS",
+    "SHELL.AS",
+    "SHUR.BR",
+    "SOF.BR",
+    "SOLB.BR",
+    "SWICH.AS",
+    "SYENS.BR",
+    "TTHEON.AS",
+    "TITC.BR",
+    "TUB.BR",
+    "UCB.BR",
+    "UUMG.AS",
+    "UUMI.BR",
+    "UUNA.AS",
+    "VGP.BR",
+    "VIO.BR",
+    "VLK.AS",
+    "VPK.AS",
+    "WDP.BR",
+    "WKL.AS"
 ]
 
-def fetch_daily_data_yahoo(tickers, period="10d"):
-    """
-    Haalt dagelijkse koersdata op van Yahoo voor een lijst tickers.
-    Retourneert dict {ticker: DataFrame} of lege dict.
-    """
+def fetch_daily_data(tickers, period="5d"):
+    """Haalt dagelijkse koersdata op voor een lijst tickers."""
     if not tickers:
         return {}
     try:
@@ -39,7 +97,6 @@ def fetch_daily_data_yahoo(tickers, period="10d"):
     except:
         pass
 
-    # Fallback: één voor één
     result = {}
     for i, t in enumerate(tickers):
         try:
@@ -52,8 +109,8 @@ def fetch_daily_data_yahoo(tickers, period="10d"):
             time.sleep(0.5)
     return result
 
-def fetch_today_open_prices_yahoo(tickers):
-    """Haalt openingskoers van vandaag via Yahoo intraday (1-minuut)."""
+def fetch_today_open_prices(tickers):
+    """Haalt voor vandaag de openingskoers op via intraday (1-minuut) data."""
     if not tickers:
         return {}
     try:
@@ -81,36 +138,40 @@ def fetch_today_open_prices_yahoo(tickers):
 
 def scan_all_patterns():
     """
-    Scant op openingsgaps van vandaag t.o.v. de laatste handelsdag vóór vandaag.
-    - Dagelijkse data: Yahoo (laatste beschikbare dag vóór vandaag)
-    - Openingskoers vandaag: Yahoo intraday (1-minuut)
-    Alleen als beide beschikbaar zijn, wordt het aandeel getoond.
+    Scant op openingsgaps van vandaag t.o.v. de verwachte vorige handelsdag.
+    Gebruikt dagdata voor vorige handelsdagen en intraday-data voor de opening van vandaag.
+    Alleen als beide datums correct aanwezig zijn, wordt het aandeel getoond.
     """
+    all_tickers = TICKERS
+    batch_size = 50
+    results = []
+
     nederland_nu = datetime.now(timezone.utc) + timedelta(hours=2)
     today_nl = nederland_nu.date()
     scan_time = nederland_nu.strftime('%H:%M:%S')
 
-    # Haal dagdata en openingskoersen op
-    daily_data = fetch_daily_data_yahoo(TICKERS, period="10d")
-    today_opens = fetch_today_open_prices_yahoo(TICKERS)
+    # Verwachte vorige handelsdag bepalen
+    if today_nl.weekday() == 0:  # maandag -> vrijdag
+        expected_prev_date = today_nl - timedelta(days=3)
+    else:
+        expected_prev_date = today_nl - timedelta(days=1)
 
-    results = []
+    daily_data = fetch_daily_data(all_tickers, period="5d")
+    today_opens = fetch_today_open_prices(all_tickers)
 
     for ticker, df in daily_data.items():
         if df is None or len(df) < 1:
             continue
         try:
-            # Kolommen opschonen
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.droplevel(1)
             if not isinstance(df.index, pd.DatetimeIndex):
                 df.index = pd.to_datetime(df.index)
 
-            # Laatste handelsdag vóór vandaag (niet strikt gisteren)
-            df_before = df[df.index.date < today_nl]
-            if df_before.empty:
+            df_prev = df[df.index.date == expected_prev_date]
+            if df_prev.empty:
                 continue
-            prev_row = df_before.iloc[-1]   # dit is de meest recente handelsdag
+            prev_row = df_prev.iloc[-1]
             prev_high = float(prev_row['High'])
             prev_low = float(prev_row['Low'])
 
@@ -118,7 +179,7 @@ def scan_all_patterns():
             if open_today is None or pd.isna(open_today):
                 continue
 
-            # Bepaal exchange en schone ticker
+            # Bepaal exchange uit de ticker
             if ticker.endswith('.AS'):
                 exchange = "Amsterdam"
                 ticker_clean = ticker.replace('.AS', '')
@@ -175,6 +236,7 @@ def get_market_status():
     hour = now.hour
     minute = now.minute
     weekday = now.weekday()
+
     if weekday >= 5:
         return "🔴 Weekend - Euronext gesloten"
     if hour < 9:
