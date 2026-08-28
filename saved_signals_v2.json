@@ -1,0 +1,200 @@
+[
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "AKZA",
+    "Vorige High": 61.52,
+    "Vorige Low": 60.84,
+    "Open Vandaag": 61.88,
+    "Gap %": 0.59,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "ARCAD",
+    "Vorige High": 44.68,
+    "Vorige Low": 43.42,
+    "Open Vandaag": 44.96,
+    "Gap %": 0.63,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "ASRNL",
+    "Vorige High": 70.76,
+    "Vorige Low": 69.3,
+    "Open Vandaag": 71.24,
+    "Gap %": 0.68,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "CCEP",
+    "Vorige High": 93.5,
+    "Vorige Low": 91.7,
+    "Open Vandaag": 93.8,
+    "Gap %": 0.32,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "EXO",
+    "Vorige High": 71.85,
+    "Vorige Low": 70.9,
+    "Open Vandaag": 72.2,
+    "Gap %": 0.49,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "HAL",
+    "Vorige High": 159.9,
+    "Vorige Low": 159.0,
+    "Open Vandaag": 158.0,
+    "Gap %": 0.63,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "HEIA",
+    "Vorige High": 72.36,
+    "Vorige Low": 71.54,
+    "Open Vandaag": 72.5,
+    "Gap %": 0.19,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "HEIO",
+    "Vorige High": 67.85,
+    "Vorige Low": 67.1,
+    "Open Vandaag": 68.0,
+    "Gap %": 0.22,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "KPN",
+    "Vorige High": 4.1,
+    "Vorige Low": 4.04,
+    "Open Vandaag": 4.1,
+    "Gap %": 0.02,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "PRX",
+    "Vorige High": 38.38,
+    "Vorige Low": 37.61,
+    "Open Vandaag": 38.59,
+    "Gap %": 0.55,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Amsterdam",
+    "Ticker": "RAND",
+    "Vorige High": 39.93,
+    "Vorige Low": 39.15,
+    "Open Vandaag": 40.0,
+    "Gap %": 0.18,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "ABI",
+    "Vorige High": 67.64,
+    "Vorige Low": 67.06,
+    "Open Vandaag": 67.92,
+    "Gap %": 0.41,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "ACKB",
+    "Vorige High": 262.6,
+    "Vorige Low": 257.4,
+    "Open Vandaag": 272.0,
+    "Gap %": 3.58,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "BREB",
+    "Vorige High": 103.8,
+    "Vorige Low": 103.0,
+    "Open Vandaag": 104.0,
+    "Gap %": 0.19,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "CMBT",
+    "Vorige High": 15.88,
+    "Vorige Low": 15.22,
+    "Open Vandaag": 16.06,
+    "Gap %": 1.13,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "GBLB",
+    "Vorige High": 73.35,
+    "Vorige Low": 72.8,
+    "Open Vandaag": 73.5,
+    "Gap %": 0.2,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "SOF",
+    "Vorige High": 247.4,
+    "Vorige Low": 243.6,
+    "Open Vandaag": 247.6,
+    "Gap %": 0.08,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-28",
+    "Tijdstip": "11:53:08",
+    "Exchange": "Brussel",
+    "Ticker": "TITC",
+    "Vorige High": 53.15,
+    "Vorige Low": 52.55,
+    "Open Vandaag": 53.2,
+    "Gap %": 0.09,
+    "Signaaltype": "Bullish Gap"
+  }
+]
