@@ -196,5 +196,82 @@
     "Open Vandaag": 53.2,
     "Gap %": 0.09,
     "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Amsterdam",
+    "Ticker": "ABN",
+    "Vorige High": 41.68,
+    "Vorige Low": 41.07,
+    "Open Vandaag": 41.71,
+    "Gap %": 0.07,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Amsterdam",
+    "Ticker": "CCEP",
+    "Vorige High": 93.9,
+    "Vorige Low": 92.5,
+    "Open Vandaag": 94.5,
+    "Gap %": 0.64,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Brussel",
+    "Ticker": "ABI",
+    "Vorige High": 68.68,
+    "Vorige Low": 67.82,
+    "Open Vandaag": 68.78,
+    "Gap %": 0.15,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Brussel",
+    "Ticker": "SHUR",
+    "Vorige High": 23.35,
+    "Vorige Low": 23.0,
+    "Open Vandaag": 22.9,
+    "Gap %": 0.43,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Brussel",
+    "Ticker": "SOLB",
+    "Vorige High": 25.92,
+    "Vorige Low": 25.44,
+    "Open Vandaag": 25.96,
+    "Gap %": 0.15,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Brussel",
+    "Ticker": "TUB",
+    "Vorige High": 191.3,
+    "Vorige Low": 186.5,
+    "Open Vandaag": 185.7,
+    "Gap %": 0.43,
+    "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Datum": "2026-08-31",
+    "Tijdstip": "11:07:09",
+    "Exchange": "Brussel",
+    "Ticker": "UMI",
+    "Vorige High": 24.0,
+    "Vorige Low": 23.54,
+    "Open Vandaag": 23.48,
+    "Gap %": 0.25,
+    "Signaaltype": "Bearish Gap"
   }
 ]
