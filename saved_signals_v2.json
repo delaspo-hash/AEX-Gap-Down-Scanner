@@ -306,5 +306,16 @@
     "Open Vandaag": 267.4,
     "Gap %": 0.22,
     "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Datum": "2026-09-03",
+    "Tijdstip": "13:02:50",
+    "Exchange": "Brussel",
+    "Ticker": "SOF",
+    "Vorige High": 242.8,
+    "Vorige Low": 238.8,
+    "Open Vandaag": 248.2,
+    "Gap %": 2.22,
+    "Signaaltype": "Bullish Gap"
   }
 ]
