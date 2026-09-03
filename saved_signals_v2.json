@@ -273,5 +273,38 @@
     "Open Vandaag": 23.48,
     "Gap %": 0.25,
     "Signaaltype": "Bearish Gap"
+  },
+  {
+    "Datum": "2026-09-03",
+    "Tijdstip": "13:02:50",
+    "Exchange": "Amsterdam",
+    "Ticker": "APAM",
+    "Vorige High": 46.96,
+    "Vorige Low": 45.28,
+    "Open Vandaag": 47.02,
+    "Gap %": 0.13,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-09-03",
+    "Tijdstip": "13:02:50",
+    "Exchange": "Amsterdam",
+    "Ticker": "ASRNL",
+    "Vorige High": 73.2,
+    "Vorige Low": 72.28,
+    "Open Vandaag": 73.28,
+    "Gap %": 0.11,
+    "Signaaltype": "Bullish Gap"
+  },
+  {
+    "Datum": "2026-09-03",
+    "Tijdstip": "13:02:50",
+    "Exchange": "Brussel",
+    "Ticker": "ACKB",
+    "Vorige High": 272.6,
+    "Vorige Low": 268.0,
+    "Open Vandaag": 267.4,
+    "Gap %": 0.22,
+    "Signaaltype": "Bearish Gap"
   }
 ]
